@@ -9,6 +9,14 @@ const renderIcon = (name: string, className = "w-5 h-5") => {
   return <IconComponent className={className} />;
 };
 
+// Helper to extract YouTube Video ID from any standard YouTube URL
+const extractYoutubeId = (url: string): string | null => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.trim().match(regExp);
+  return (match && match[2].length === 11) ? match[2] : url.trim();
+};
+
 function App() {
   // App views: "home" | "booking" | "track" | "admin" | "settings"
   const [view, setView] = useState<"home" | "booking" | "track" | "admin" | "settings">("home");
@@ -69,6 +77,7 @@ function App() {
   const [settingsCurrencyInput, setSettingsCurrencyInput] = useState("");
   const [settingsRecoveryQuestionInput, setSettingsRecoveryQuestionInput] = useState("");
   const [settingsRecoveryAnswerInput, setSettingsRecoveryAnswerInput] = useState("");
+  const [settingsVideosInput, setSettingsVideosInput] = useState("");
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSyncingOffline, setIsSyncingOffline] = useState(false);
 
@@ -124,6 +133,7 @@ function App() {
       setSettingsCurrencyInput(data.settings.currencySymbol);
       setSettingsRecoveryQuestionInput(data.settings.recoveryQuestion || "What was the name of your first school?");
       setSettingsRecoveryAnswerInput(data.settings.recoveryAnswer || "primary");
+      setSettingsVideosInput(data.settings.feedbackVideos || "");
     } catch (error) {
       console.error("Error loading initial data:", error);
     } finally {
@@ -359,7 +369,8 @@ function App() {
       currencySymbol: settingsCurrencyInput,
       googleAppsScriptUrl: settingsUrlInput,
       recoveryQuestion: settingsRecoveryQuestionInput,
-      recoveryAnswer: settingsRecoveryAnswerInput
+      recoveryAnswer: settingsRecoveryAnswerInput,
+      feedbackVideos: settingsVideosInput
     };
     
     GoogleSheetsBridge.saveSettingsLocally(updatedSettings);
@@ -519,6 +530,51 @@ function App() {
                     </button>
                   ))}
                 </div>
+
+                {/* Customer Feedback Videos */}
+                {(() => {
+                  const videoUrls = (settings.feedbackVideos || "").split("\n").map(line => line.trim()).filter(Boolean);
+                  const videoIds = videoUrls.map(url => extractYoutubeId(url)).filter(Boolean) as string[];
+
+                  if (videoIds.length === 0) return null;
+
+                  return (
+                    <div className="premium-card text-left p-0 overflow-hidden mb-4 bg-white border border-gray-150">
+                      <div className="p-4 border-b border-gray-100 bg-slate-50/50">
+                        <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                          {renderIcon("Video", "w-4 h-4 text-primary")}
+                          Watch Real Customer Feedback
+                        </h4>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Hear what our customers in the community say about our eco-friendly cleaning services.
+                        </p>
+                      </div>
+                      
+                      <div className="p-4">
+                        <div className="flex gap-4 overflow-x-auto pb-2 snap-x scrollbar-thin">
+                          {videoIds.map((id, index) => (
+                            <div key={id} className="w-[280px] flex-shrink-0 snap-start bg-slate-50 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
+                              <div className="relative aspect-video">
+                                <iframe
+                                  src={`https://www.youtube.com/embed/${id}`}
+                                  title={`Customer Review Video ${index + 1}`}
+                                  className="absolute inset-0 w-full h-full border-0"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                ></iframe>
+                              </div>
+                              <div className="p-2 text-center bg-white border-t border-slate-100">
+                                <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                                  Customer Review #{index + 1}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Customer Status Checking Shortcut */}
                 <div className="premium-card bg-emerald-50 border-emerald-100 flex items-center justify-between">
@@ -1242,8 +1298,57 @@ function App() {
             {/* VIEW: SETTINGS */}
             {view === "settings" && (
               <div className="animate-fade-in text-left">
-                <h2 className="text-lg font-extrabold text-primary mb-2">App Settings</h2>
-                <p className="text-xs text-muted mb-4">Configure cleaning packages, currencies, and Google Sheets database URL.</p>
+                {!isAdminAuthenticated ? (
+                  /* Admin Password Lock Screen for Settings */
+                  <div className="premium-card text-center max-w-sm mx-auto my-8">
+                    <div className="inline-block bg-emerald-50 text-primary p-3 rounded-full mb-3">
+                      {renderIcon("Key", "w-8 h-8")}
+                    </div>
+                    <h3 className="text-md font-bold text-gray-800 mb-1">Owner Admin Settings</h3>
+                    <p className="text-xs text-muted mb-4">Access restricted. Enter company security passcode to configure settings.</p>
+
+                    <form onSubmit={handleAdminLogin} className="space-y-4">
+                      <div className="form-group text-left">
+                        <label htmlFor="admin-settings-passcode">Security Passcode</label>
+                        <input
+                          id="admin-settings-passcode"
+                          type="password"
+                          placeholder="e.g. admin123"
+                          value={adminPassInput}
+                          onChange={(e) => setAdminPassInput(e.target.value)}
+                          className="form-control text-center"
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-xs mt-1 mb-2">
+                        <span></span>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setIsRecoveryOpen(true);
+                            setRecoveryError("");
+                            setRecoveryAnswerInput("");
+                            setIsPasscodeResetEligible(false);
+                          }}
+                          className="text-primary hover:underline font-semibold focus:outline-none"
+                        >
+                          Forgot passcode?
+                        </button>
+                      </div>
+                      
+                      {adminAuthError && (
+                        <p className="text-xs font-semibold text-red-600">{adminAuthError}</p>
+                      )}
+
+                      <button type="submit" className="btn btn-primary">
+                        Verify & Unlock
+                      </button>
+                    </form>
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-lg font-extrabold text-primary mb-2">App Settings</h2>
+                    <p className="text-xs text-muted mb-4">Configure cleaning packages, currencies, and Google Sheets database URL.</p>
 
                 {/* Database Connectivity Status Alert Box */}
                 {syncMessage && (
@@ -1375,6 +1480,29 @@ function App() {
                   </div>
                 </div>
 
+                {/* Section: Feedback & Testimonial Videos */}
+                <div className="premium-card">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    {renderIcon("Video", "w-4 h-4")} Customer Feedback Videos (YouTube)
+                  </h3>
+                  <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                    Paste YouTube video links or IDs (one per line) below. These videos will be embedded in a beautiful carousel on the home page so users can watch real customer reviews!
+                  </p>
+                  
+                  <div className="form-group text-left">
+                    <label htmlFor="settings-feedback-videos">YouTube Links / IDs (one per line)</label>
+                    <textarea 
+                      id="settings-feedback-videos"
+                      rows={4}
+                      placeholder="e.g.&#10;https://www.youtube.com/watch?v=1s9S4N5h-3A&#10;https://youtu.be/wX-y0K43o1k"
+                      value={settingsVideosInput} 
+                      onChange={(e) => setSettingsVideosInput(e.target.value)}
+                      className="form-control text-left"
+                      style={{ fontFamily: "monospace", fontSize: "12px", lineHeight: "1.5" }}
+                    />
+                  </div>
+                </div>
+
                 {/* Section 3: Step-by-Step copy-paste guides */}
                 <div className="premium-card bg-slate-50">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -1397,6 +1525,8 @@ function App() {
                 >
                   Save App Configurations
                 </button>
+                  </>
+                )}
               </div>
             )}
           </>

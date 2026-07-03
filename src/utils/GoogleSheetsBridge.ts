@@ -34,6 +34,7 @@ export interface CompanySettings {
   googleAppsScriptUrl?: string;
   recoveryQuestion?: string;
   recoveryAnswer?: string;
+  feedbackVideos?: string;
 }
 
 const DEFAULT_SERVICES: Service[] = [
@@ -100,7 +101,8 @@ const DEFAULT_SETTINGS: CompanySettings = {
   adminPasscode: "admin123",
   currencySymbol: "₹",
   recoveryQuestion: "What was the name of your first school?",
-  recoveryAnswer: "primary"
+  recoveryAnswer: "primary",
+  feedbackVideos: "https://www.youtube.com/watch?v=1s9S4N5h-3A\nhttps://www.youtube.com/watch?v=wX-y0K43o1k"
 };
 
 export class GoogleSheetsBridge {
