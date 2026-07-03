@@ -67,8 +67,19 @@ function App() {
   const [settingsEmailInput, setSettingsEmailInput] = useState("");
   const [settingsPassInput, setSettingsPassInput] = useState("");
   const [settingsCurrencyInput, setSettingsCurrencyInput] = useState("");
+  const [settingsRecoveryQuestionInput, setSettingsRecoveryQuestionInput] = useState("");
+  const [settingsRecoveryAnswerInput, setSettingsRecoveryAnswerInput] = useState("");
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSyncingOffline, setIsSyncingOffline] = useState(false);
+
+  // Passcode Recovery Modal States
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
+  const [recoveryAnswerInput, setRecoveryAnswerInput] = useState("");
+  const [recoveryError, setRecoveryError] = useState("");
+  const [isPasscodeResetEligible, setIsPasscodeResetEligible] = useState(false);
+  const [newPasscodeInput, setNewPasscodeInput] = useState("");
+  const [newPasscodeConfirmInput, setNewPasscodeConfirmInput] = useState("");
+  const [recoverySuccessMessage, setRecoverySuccessMessage] = useState("");
 
   // Service Pricing Addons Definition
   const addonsList = [
@@ -111,6 +122,8 @@ function App() {
       setSettingsEmailInput(data.settings.companyEmail);
       setSettingsPassInput(data.settings.adminPasscode);
       setSettingsCurrencyInput(data.settings.currencySymbol);
+      setSettingsRecoveryQuestionInput(data.settings.recoveryQuestion || "What was the name of your first school?");
+      setSettingsRecoveryAnswerInput(data.settings.recoveryAnswer || "primary");
     } catch (error) {
       console.error("Error loading initial data:", error);
     } finally {
@@ -252,6 +265,54 @@ function App() {
     }
   };
 
+  // Passcode Recovery handlers
+  const handleVerifyRecoveryAnswer = (e: React.FormEvent) => {
+    e.preventDefault();
+    const correctAnswer = (settings.recoveryAnswer || "primary").toLowerCase().trim();
+    const inputAnswer = recoveryAnswerInput.toLowerCase().trim();
+    
+    if (inputAnswer === correctAnswer) {
+      setIsPasscodeResetEligible(true);
+      setRecoveryError("");
+    } else {
+      setRecoveryError("Incorrect answer. Please try again or check your Google Sheet.");
+    }
+  };
+
+  const handleResetPasscode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPasscodeInput.trim()) {
+      setRecoveryError("Passcode cannot be empty.");
+      return;
+    }
+    if (newPasscodeInput !== newPasscodeConfirmInput) {
+      setRecoveryError("Passcodes do not match.");
+      return;
+    }
+
+    const updatedSettings = {
+      ...settings,
+      adminPasscode: newPasscodeInput
+    };
+
+    GoogleSheetsBridge.saveSettingsLocally(updatedSettings);
+    setSettings(updatedSettings);
+    setSettingsPassInput(newPasscodeInput);
+
+    setRecoverySuccessMessage("Passcode reset successfully! You can now log in.");
+    setRecoveryError("");
+    
+    // Clear recovery states after a brief delay
+    setTimeout(() => {
+      setIsRecoveryOpen(false);
+      setIsPasscodeResetEligible(false);
+      setRecoveryAnswerInput("");
+      setNewPasscodeInput("");
+      setNewPasscodeConfirmInput("");
+      setRecoverySuccessMessage("");
+    }, 2500);
+  };
+
   // Admin edit actions
   const startEditingBooking = (booking: Booking) => {
     setEditingBooking(booking);
@@ -296,7 +357,9 @@ function App() {
       companyEmail: settingsEmailInput,
       adminPasscode: settingsPassInput,
       currencySymbol: settingsCurrencyInput,
-      googleAppsScriptUrl: settingsUrlInput
+      googleAppsScriptUrl: settingsUrlInput,
+      recoveryQuestion: settingsRecoveryQuestionInput,
+      recoveryAnswer: settingsRecoveryAnswerInput
     };
     
     GoogleSheetsBridge.saveSettingsLocally(updatedSettings);
@@ -978,6 +1041,22 @@ function App() {
                         />
                       </div>
                       
+                      <div className="flex justify-between items-center text-xs mt-1 mb-2">
+                        <span></span>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setIsRecoveryOpen(true);
+                            setRecoveryError("");
+                            setRecoveryAnswerInput("");
+                            setIsPasscodeResetEligible(false);
+                          }}
+                          className="text-primary hover:underline font-semibold focus:outline-none"
+                        >
+                          Forgot passcode?
+                        </button>
+                      </div>
+                      
                       {adminAuthError && (
                         <p className="text-xs font-semibold text-red-600">{adminAuthError}</p>
                       )}
@@ -1231,6 +1310,33 @@ function App() {
                   </div>
                 </div>
 
+                {/* Passcode Security Recovery Card */}
+                <div className="premium-card">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Passcode Recovery Settings</h3>
+                  
+                  <div className="form-group">
+                    <label>Forgot Passcode Security Question</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. What was the name of your first school?"
+                      value={settingsRecoveryQuestionInput} 
+                      onChange={(e) => setSettingsRecoveryQuestionInput(e.target.value)}
+                      className="form-control"
+                    />
+                  </div>
+                  
+                  <div className="form-group mt-2">
+                    <label>Security Answer (case-insensitive)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. primary"
+                      value={settingsRecoveryAnswerInput} 
+                      onChange={(e) => setSettingsRecoveryAnswerInput(e.target.value)}
+                      className="form-control"
+                    />
+                  </div>
+                </div>
+
                 {/* Section 2: Google Sheets Sync URL */}
                 <div className="premium-card bg-emerald-50/50 border-emerald-100">
                   <h3 className="text-xs font-bold text-primary uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -1335,6 +1441,109 @@ function App() {
           <span>Settings</span>
         </button>
       </nav>
+
+      {/* PASSCODE RECOVERY MODAL */}
+      {isRecoveryOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-scale-in text-left">
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-3 flex justify-between items-center">
+              <h3 className="font-bold text-sm">Reset Admin Passcode</h3>
+              <button 
+                onClick={() => setIsRecoveryOpen(false)}
+                className="text-white hover:text-gray-200 focus:outline-none"
+              >
+                {renderIcon("X", "w-5 h-5")}
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              {recoverySuccessMessage ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-center space-y-2">
+                  <div className="inline-block text-primary p-2 bg-white rounded-full">
+                    {renderIcon("CheckCircle", "w-6 h-6")}
+                  </div>
+                  <p className="text-xs font-semibold text-emerald-800">{recoverySuccessMessage}</p>
+                </div>
+              ) : !isPasscodeResetEligible ? (
+                /* Verification Step */
+                <form onSubmit={handleVerifyRecoveryAnswer} className="space-y-3">
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-xs text-muted mb-2">
+                    <span className="font-bold text-gray-700 block mb-1">Spreadsheet Recovery Tip:</span>
+                    Since your database is stored on your Google Drive, you can always find or edit your passcode directly in your spreadsheet! Open your Google Sheet, click the <b>settings</b> tab, and your passcode will be in the table.
+                  </div>
+                  
+                  <div className="form-group">
+                    <label className="text-xs font-bold text-gray-700">Security Question</label>
+                    <div className="text-xs bg-emerald-50/50 border border-emerald-100/50 p-3 rounded-lg text-gray-800 font-medium italic mt-1">
+                      "{settings.recoveryQuestion || "What was the name of your first school?"}"
+                    </div>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="recovery-answer">Your Answer</label>
+                    <input 
+                      type="text" 
+                      id="recovery-answer"
+                      placeholder="Type the answer you configured..."
+                      value={recoveryAnswerInput}
+                      onChange={(e) => setRecoveryAnswerInput(e.target.value)}
+                      className="form-control"
+                      required
+                    />
+                  </div>
+                  
+                  {recoveryError && (
+                    <p className="text-xs font-semibold text-red-600">{recoveryError}</p>
+                  )}
+                  
+                  <button type="submit" className="btn btn-primary w-full mt-2">
+                    Verify Answer
+                  </button>
+                </form>
+              ) : (
+                /* Passcode Reset Step */
+                <form onSubmit={handleResetPasscode} className="space-y-3">
+                  <p className="text-xs text-muted mb-2">Security verified! Enter your new admin passcode below.</p>
+                  
+                  <div className="form-group">
+                    <label htmlFor="new-passcode">New Passcode</label>
+                    <input 
+                      type="password" 
+                      id="new-passcode"
+                      placeholder="e.g. admin987"
+                      value={newPasscodeInput}
+                      onChange={(e) => setNewPasscodeInput(e.target.value)}
+                      className="form-control"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="new-passcode-confirm">Confirm Passcode</label>
+                    <input 
+                      type="password" 
+                      id="new-passcode-confirm"
+                      placeholder="Re-type new passcode..."
+                      value={newPasscodeConfirmInput}
+                      onChange={(e) => setNewPasscodeConfirmInput(e.target.value)}
+                      className="form-control"
+                      required
+                    />
+                  </div>
+                  
+                  {recoveryError && (
+                    <p className="text-xs font-semibold text-red-600">{recoveryError}</p>
+                  )}
+                  
+                  <button type="submit" className="btn btn-primary w-full mt-2">
+                    Save New Passcode
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

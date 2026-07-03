@@ -32,6 +32,8 @@ export interface CompanySettings {
   adminPasscode: string;
   currencySymbol: string;
   googleAppsScriptUrl?: string;
+  recoveryQuestion?: string;
+  recoveryAnswer?: string;
 }
 
 const DEFAULT_SERVICES: Service[] = [
@@ -96,7 +98,9 @@ const DEFAULT_SETTINGS: CompanySettings = {
   companyPhone: "+91 96763 28206",
   companyEmail: "info@naturehomeclean.com",
   adminPasscode: "admin123",
-  currencySymbol: "₹"
+  currencySymbol: "₹",
+  recoveryQuestion: "What was the name of your first school?",
+  recoveryAnswer: "primary"
 };
 
 export class GoogleSheetsBridge {
