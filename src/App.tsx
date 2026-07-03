@@ -78,6 +78,10 @@ function App() {
   const [settingsRecoveryQuestionInput, setSettingsRecoveryQuestionInput] = useState("");
   const [settingsRecoveryAnswerInput, setSettingsRecoveryAnswerInput] = useState("");
   const [settingsVideosInput, setSettingsVideosInput] = useState("");
+  const [settingsTwilioSidInput, setSettingsTwilioSidInput] = useState("");
+  const [settingsTwilioTokenInput, setSettingsTwilioTokenInput] = useState("");
+  const [settingsTwilioFromInput, setSettingsTwilioFromInput] = useState("");
+  const [settingsTwilioWhatsAppInput, setSettingsTwilioWhatsAppInput] = useState("");
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSyncingOffline, setIsSyncingOffline] = useState(false);
 
@@ -134,6 +138,10 @@ function App() {
       setSettingsRecoveryQuestionInput(data.settings.recoveryQuestion || "What was the name of your first school?");
       setSettingsRecoveryAnswerInput(data.settings.recoveryAnswer || "primary");
       setSettingsVideosInput(data.settings.feedbackVideos || "");
+      setSettingsTwilioSidInput(data.settings.twilioAccountSid || "");
+      setSettingsTwilioTokenInput(data.settings.twilioAuthToken || "");
+      setSettingsTwilioFromInput(data.settings.twilioFromNumber || "");
+      setSettingsTwilioWhatsAppInput(data.settings.twilioWhatsAppNumber || "");
     } catch (error) {
       console.error("Error loading initial data:", error);
     } finally {
@@ -370,7 +378,11 @@ function App() {
       googleAppsScriptUrl: settingsUrlInput,
       recoveryQuestion: settingsRecoveryQuestionInput,
       recoveryAnswer: settingsRecoveryAnswerInput,
-      feedbackVideos: settingsVideosInput
+      feedbackVideos: settingsVideosInput,
+      twilioAccountSid: settingsTwilioSidInput,
+      twilioAuthToken: settingsTwilioTokenInput,
+      twilioFromNumber: settingsTwilioFromInput,
+      twilioWhatsAppNumber: settingsTwilioWhatsAppInput
     };
     
     GoogleSheetsBridge.saveSettingsLocally(updatedSettings);
@@ -1269,6 +1281,36 @@ function App() {
                           />
                         </div>
 
+                        {/* Automated/Manual Mobile Notifications */}
+                        <div className="mb-4">
+                          <label className="block text-gray-400 font-bold mb-1.5">Share Mobile Alerts</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <a
+                              href={`https://wa.me/${editingBooking.customerPhone.replace(/[\s\-\(\)\+]/g, '').length === 10 ? '91' : ''}${editingBooking.customerPhone.replace(/[\s\-\(\)\+]/g, '')}?text=${encodeURIComponent(
+                                `Hi ${editingBooking.customerName}, your booking ${editingBooking.bookingId} for ${editingBooking.serviceName} on ${editingBooking.date} @ ${editingBooking.timeSlot} is updated to status: ${editStatus}. Assigned cleaner: ${editCleaner}. Total: ${settings.currencySymbol}${editingBooking.totalPrice}. Thank you! - ${settings.companyName}`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-outline py-2 text-xs flex items-center justify-center gap-1.5 border-emerald-500 text-emerald-700 hover:bg-emerald-50/50"
+                            >
+                              {renderIcon("MessageSquare", "w-4 h-4 text-emerald-600")}
+                              <span>WhatsApp Cust</span>
+                            </a>
+
+                            <a
+                              href={`https://wa.me/?text=${encodeURIComponent(
+                                `Hi, you are assigned to booking ${editingBooking.bookingId} for ${editingBooking.customerName} (${editingBooking.customerPhone}) on ${editingBooking.date} @ ${editingBooking.timeSlot}. Service: ${editingBooking.serviceName}. Address: ${editingBooking.customerAddress}. Notes: ${editNotes || 'None'}`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-outline py-2 text-xs flex items-center justify-center gap-1.5 border-blue-500 text-blue-700 hover:bg-blue-50/50"
+                            >
+                              {renderIcon("UserCheck", "w-4 h-4 text-blue-600")}
+                              <span>WhatsApp Crew</span>
+                            </a>
+                          </div>
+                        </div>
+
                         {/* Admin Notes */}
                         <div className="form-group">
                           <label>Admin & Cleaner Notes</label>
@@ -1477,6 +1519,61 @@ function App() {
                     >
                       {isSyncingOffline ? "Syncing..." : "Sync Offline Data"}
                     </button>
+                  </div>
+                </div>
+
+                {/* Section: Twilio SMS & WhatsApp Settings */}
+                <div className="premium-card">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    {renderIcon("MessageSquare", "w-4 h-4 text-primary")} Automated Twilio Alerts (Optional)
+                  </h3>
+                  <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                    Enter your Twilio API credentials to automatically send SMS or WhatsApp confirmations. Leave empty to use manual WhatsApp triggers on bookings instead.
+                  </p>
+                  
+                  <div className="form-group text-left">
+                    <label>Twilio Account SID</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                      value={settingsTwilioSidInput} 
+                      onChange={(e) => setSettingsTwilioSidInput(e.target.value)}
+                      className="form-control"
+                    />
+                  </div>
+
+                  <div className="form-group text-left">
+                    <label>Twilio Auth Token</label>
+                    <input 
+                      type="password" 
+                      placeholder="Auth Token"
+                      value={settingsTwilioTokenInput} 
+                      onChange={(e) => setSettingsTwilioTokenInput(e.target.value)}
+                      className="form-control"
+                    />
+                  </div>
+
+                  <div className="form-row-2 text-left">
+                    <div className="form-group">
+                      <label>SMS Sender Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. +14155552671"
+                        value={settingsTwilioFromInput} 
+                        onChange={(e) => setSettingsTwilioFromInput(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>WhatsApp Sender Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. +14155238886"
+                        value={settingsTwilioWhatsAppInput} 
+                        onChange={(e) => setSettingsTwilioWhatsAppInput(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
                   </div>
                 </div>
 

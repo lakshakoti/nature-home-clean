@@ -195,7 +195,11 @@ function initializeSheets() {
       ["companyPhone", "+91 96763 28206"],
       ["companyEmail", "info@naturehomeclean.com"],
       ["adminPasscode", "admin123"],
-      ["currencySymbol", "₹"]
+      ["currencySymbol", "₹"],
+      ["twilioAccountSid", ""],
+      ["twilioAuthToken", ""],
+      ["twilioFromNumber", ""],
+      ["twilioWhatsAppNumber", ""]
     ];
     
     defaultSettings.forEach(row => settingsSheet.appendRow(row));
@@ -269,7 +273,27 @@ function createBooking(ss, booking) {
   
   sheet.appendRow(newRow);
   
-  return { success: true, bookingId: bookingId, booking: booking };
+  // Format booking object for notifications
+  const bookingObj = {
+    bookingId: bookingId,
+    date: booking.date,
+    timeSlot: booking.timeSlot,
+    serviceName: booking.serviceName,
+    homeSize: booking.homeSize || "",
+    totalPrice: booking.totalPrice,
+    customerName: booking.customerName,
+    customerEmail: booking.customerEmail,
+    customerPhone: booking.customerPhone,
+    customerAddress: booking.customerAddress,
+    status: booking.status || "Pending",
+    cleanerAssigned: booking.cleanerAssigned || "Unassigned",
+    adminNotes: booking.adminNotes || "",
+    createdAt: new Date().toISOString()
+  };
+  
+  sendNotifications(bookingObj, "create");
+  
+  return { success: true, bookingId: bookingId, booking: bookingObj };
 }
 
 // Update a booking row
@@ -297,6 +321,18 @@ function updateBooking(ss, bookingId, updates) {
     if (colIndex !== -1) {
       sheet.getRange(targetRowIndex, colIndex + 1).setValue(updates[key]);
     }
+  }
+  
+  // Fetch updated booking row to send update notification
+  try {
+    const rowValues = sheet.getRange(targetRowIndex, 1, 1, headers.length).getValues()[0];
+    const bookingObj = {};
+    headers.forEach((header, index) => {
+      bookingObj[toCamelCase(header)] = rowValues[index];
+    });
+    sendNotifications(bookingObj, "update");
+  } catch (notificationErr) {
+    console.error("Failed to trigger update notification:", notificationErr);
   }
   
   return { success: true, message: "Booking updated successfully" };
@@ -343,4 +379,251 @@ function fromCamelCase(key) {
     createdAt: "Created At"
   };
   return mapping[key] || key;
+}
+
+// Send automated email and twilio mobile/whatsapp alerts
+function sendNotifications(booking, type) {
+  try {
+    const ss = getSpreadsheet();
+    // Load Settings
+    const settings = {};
+    const settingsRows = ss.getSheetByName("Settings").getDataRange().getValues();
+    for (let i = 1; i < settingsRows.length; i++) {
+      settings[settingsRows[i][0]] = settingsRows[i][1];
+    }
+    
+    const companyName = settings.companyName || "Nature Home Clean Services";
+    const companyPhone = settings.companyPhone || "";
+    const companyEmail = settings.companyEmail || "";
+    const currencySymbol = settings.currencySymbol || "₹";
+
+    if (type === "create") {
+      // 1. Send Email to Customer
+      if (booking.customerEmail && booking.customerEmail.includes("@")) {
+        const subject = "Booking Confirmed - " + booking.bookingId + " | " + companyName;
+        const body = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #d1e7dd; border-radius: 8px; overflow: hidden;">
+            <div style="background-color: #0f5132; color: white; padding: 20px; text-align: center;">
+              <h2 style="margin: 0;">${companyName}</h2>
+              <p style="margin: 5px 0 0 0;">Eco-Green Cleaning Booking Confirmed!</p>
+            </div>
+            <div style="padding: 20px; color: #212529;">
+              <p>Hi <strong>${booking.customerName}</strong>,</p>
+              <p>Thank you for choosing ${companyName}! Your booking has been successfully scheduled. Here are your details:</p>
+              
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr style="background-color: #f8f9fa;">
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Reference ID</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6; color: #0f5132; font-weight: bold;">${booking.bookingId}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Service Name</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6;">${booking.serviceName}</td>
+                </tr>
+                <tr style="background-color: #f8f9fa;">
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Home Size</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6;">${booking.homeSize}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Date & Time</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6;">${booking.date} @ ${booking.timeSlot}</td>
+                </tr>
+                <tr style="background-color: #f8f9fa;">
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Total Price</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold; color: #198754;">${currencySymbol}${booking.totalPrice}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Address</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6;">${booking.customerAddress}</td>
+                </tr>
+              </table>
+              
+              <p>You can track the status of your booking inside the app using your reference ID: <strong>${booking.bookingId}</strong>.</p>
+              
+              <hr style="border: 0; border-top: 1px solid #dee2e6; margin: 20px 0;" />
+              <p style="font-size: 12px; color: #6c757d; text-align: center;">
+                Need help? Call us at ${companyPhone} or email ${companyEmail}.
+              </p>
+            </div>
+          </div>
+        `;
+        MailApp.sendEmail({
+          to: booking.customerEmail,
+          subject: subject,
+          htmlBody: body
+        });
+      }
+      
+      // 2. Send Email to Admin
+      if (companyEmail && companyEmail.includes("@")) {
+        const subject = "NEW BOOKING ALERT: " + booking.bookingId + " | " + booking.customerName;
+        const body = `
+          <h2>New Service Booking Form Received</h2>
+          <p>A new cleaning service has been booked:</p>
+          <ul>
+            <li><strong>Booking ID:</strong> ${booking.bookingId}</li>
+            <li><strong>Customer Name:</strong> ${booking.customerName}</li>
+            <li><strong>Phone:</strong> ${booking.customerPhone}</li>
+            <li><strong>Email:</strong> ${booking.customerEmail}</li>
+            <li><strong>Service:</strong> ${booking.serviceName}</li>
+            <li><strong>Home Size:</strong> ${booking.homeSize}</li>
+            <li><strong>Date & Slot:</strong> ${booking.date} @ ${booking.timeSlot}</li>
+            <li><strong>Price:</strong> ${currencySymbol}${booking.totalPrice}</li>
+            <li><strong>Address:</strong> ${booking.customerAddress}</li>
+            <li><strong>Notes:</strong> ${booking.adminNotes || "None"}</li>
+          </ul>
+          <p>Please log in to the admin dashboard to assign a cleaner and update the status.</p>
+        `;
+        MailApp.sendEmail({
+          to: companyEmail,
+          subject: subject,
+          htmlBody: body
+        });
+      }
+
+      // 3. Send Twilio Alerts
+      if (settings.twilioAccountSid && settings.twilioAuthToken) {
+        const msg = `Hi ${booking.customerName}, your booking ${booking.bookingId} for ${booking.serviceName} on ${booking.date} @ ${booking.timeSlot} is confirmed. Total: ${currencySymbol}${booking.totalPrice}. Track status at the app! Thank you - ${companyName}`;
+        if (settings.twilioFromNumber) {
+          sendTwilioMessage(settings, booking.customerPhone, msg, false);
+        }
+        if (settings.twilioWhatsAppNumber) {
+          sendTwilioMessage(settings, booking.customerPhone, msg, true);
+        }
+        
+        const adminMsg = `New Clean Booking ${booking.bookingId}: ${booking.customerName} (${booking.customerPhone}), Service: ${booking.serviceName}, Address: ${booking.customerAddress}, Date: ${booking.date} @ ${booking.timeSlot}.`;
+        if (companyPhone) {
+          if (settings.twilioFromNumber) {
+            sendTwilioMessage(settings, companyPhone, adminMsg, false);
+          }
+          if (settings.twilioWhatsAppNumber) {
+            sendTwilioMessage(settings, companyPhone, adminMsg, true);
+          }
+        }
+      }
+    } else if (type === "update") {
+      // 1. Send Email to Customer on update
+      if (booking.customerEmail && booking.customerEmail.includes("@")) {
+        const subject = "Booking Status Updated - " + booking.bookingId + " | " + companyName;
+        const body = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #cee3f8; border-radius: 8px; overflow: hidden;">
+            <div style="background-color: #0b5ed7; color: white; padding: 20px; text-align: center;">
+              <h2 style="margin: 0;">Booking Update</h2>
+              <p style="margin: 5px 0 0 0;">Reference ID: ${booking.bookingId}</p>
+            </div>
+            <div style="padding: 20px; color: #212529;">
+              <p>Hi <strong>${booking.customerName}</strong>,</p>
+              <p>Your booking status has been updated by the administrator:</p>
+              
+              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; margin: 15px 0; text-align: center;">
+                <span style="font-size: 14px; text-transform: uppercase; color: #6c757d; font-weight: bold; display: block;">New Status</span>
+                <strong style="font-size: 20px; color: #0b5ed7;">${booking.status}</strong>
+              </div>
+              
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr>
+                  <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: bold;">Assigned Cleaner</td>
+                  <td style="padding: 8px; border: 1px solid #dee2e6;">${booking.cleanerAssigned || "Unassigned"}</td>
+                </tr>
+                <tr style="background-color: #f8f9fa;">
+                  <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: bold;">Date & Time</td>
+                  <td style="padding: 8px; border: 1px solid #dee2e6;">${booking.date} @ ${booking.timeSlot}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: bold;">Total Price</td>
+                  <td style="padding: 8px; border: 1px solid #dee2e6; font-weight: bold;">${currencySymbol}${booking.totalPrice}</td>
+                </tr>
+              </table>
+              
+              <p>You can track real-time status updates inside the app using your ID: <strong>${booking.bookingId}</strong>.</p>
+              
+              <hr style="border: 0; border-top: 1px solid #dee2e6; margin: 20px 0;" />
+              <p style="font-size: 12px; color: #6c757d; text-align: center;">
+                Need help? Call us at ${companyPhone} or email ${companyEmail}.
+              </p>
+            </div>
+          </div>
+        `;
+        MailApp.sendEmail({
+          to: booking.customerEmail,
+          subject: subject,
+          htmlBody: body
+        });
+      }
+
+      // 2. Send Twilio Alerts on update
+      if (settings.twilioAccountSid && settings.twilioAuthToken) {
+        const cleanerStr = booking.cleanerAssigned && booking.cleanerAssigned !== "Unassigned" ? `, Cleaner: ${booking.cleanerAssigned}` : "";
+        const msg = `Hi ${booking.customerName}, your booking ${booking.bookingId} status is updated to: ${booking.status}${cleanerStr}. Track status at the app. - ${companyName}`;
+        
+        if (settings.twilioFromNumber) {
+          sendTwilioMessage(settings, booking.customerPhone, msg, false);
+        }
+        if (settings.twilioWhatsAppNumber) {
+          sendTwilioMessage(settings, booking.customerPhone, msg, true);
+        }
+        
+        // If a cleaner was newly assigned, send details to their phone if cleanerAssigned has a phone number
+        const phoneMatch = booking.cleanerAssigned.match(/\+?\d[\d\s\-\(\)]{8,}\d/);
+        if (phoneMatch) {
+          const cleanerPhone = phoneMatch[0];
+          const cleanerMsg = `Hi, you are assigned to booking ${booking.bookingId} for ${booking.customerName} (${booking.customerPhone}) on ${booking.date} @ ${booking.timeSlot}. Address: ${booking.customerAddress}. Notes: ${booking.adminNotes}`;
+          if (settings.twilioFromNumber) {
+            sendTwilioMessage(settings, cleanerPhone, cleanerMsg, false);
+          }
+          if (settings.twilioWhatsAppNumber) {
+            sendTwilioMessage(settings, cleanerPhone, cleanerMsg, true);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Notification failed: ", err);
+  }
+}
+
+// Twilio API Fetch helper
+function sendTwilioMessage(settings, to, body, isWhatsApp) {
+  try {
+    const sid = settings.twilioAccountSid;
+    const token = settings.twilioAuthToken;
+    let fromNum = isWhatsApp ? settings.twilioWhatsAppNumber : settings.twilioFromNumber;
+    
+    if (!sid || !token || !fromNum) return;
+    
+    let formattedTo = to.trim().replace(/[\s\-\(\)]/g, "");
+    if (!formattedTo.startsWith("+") && !formattedTo.startsWith("whatsapp:")) {
+      formattedTo = "+91" + formattedTo; // India default prefix
+    }
+    
+    let formattedFrom = fromNum.trim();
+    if (isWhatsApp) {
+      if (!formattedFrom.startsWith("whatsapp:")) {
+        formattedFrom = "whatsapp:" + formattedFrom;
+      }
+      if (!formattedTo.startsWith("whatsapp:")) {
+        formattedTo = "whatsapp:" + formattedTo;
+      }
+    }
+    
+    const url = "https://api.twilio.com/2010-04-01/Accounts/" + sid + "/Messages.json";
+    const payload = {
+      "To": formattedTo,
+      "From": formattedFrom,
+      "Body": body
+    };
+    
+    const options = {
+      "method": "post",
+      "headers": {
+        "Authorization": "Basic " + Utilities.base64Encode(sid + ":" + token)
+      },
+      "payload": payload,
+      "muteHttpExceptions": true
+    };
+    
+    UrlFetchApp.fetch(url, options);
+  } catch (e) {
+    console.error("Twilio send failed: " + e.toString());
+  }
 }

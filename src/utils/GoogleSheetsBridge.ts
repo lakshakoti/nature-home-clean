@@ -35,6 +35,10 @@ export interface CompanySettings {
   recoveryQuestion?: string;
   recoveryAnswer?: string;
   feedbackVideos?: string;
+  twilioAccountSid?: string;
+  twilioAuthToken?: string;
+  twilioFromNumber?: string;
+  twilioWhatsAppNumber?: string;
 }
 
 const DEFAULT_SERVICES: Service[] = [
@@ -186,7 +190,14 @@ export class GoogleSheetsBridge {
             companyEmail: sheetSettingsObj.companyEmail || settings.companyEmail,
             adminPasscode: sheetSettingsObj.adminPasscode || settings.adminPasscode,
             currencySymbol: sheetSettingsObj.currencySymbol || settings.currencySymbol,
-            googleAppsScriptUrl: settings.googleAppsScriptUrl
+            googleAppsScriptUrl: settings.googleAppsScriptUrl,
+            recoveryQuestion: sheetSettingsObj.recoveryQuestion || settings.recoveryQuestion,
+            recoveryAnswer: sheetSettingsObj.recoveryAnswer || settings.recoveryAnswer,
+            feedbackVideos: sheetSettingsObj.feedbackVideos || settings.feedbackVideos,
+            twilioAccountSid: sheetSettingsObj.twilioAccountSid || settings.twilioAccountSid,
+            twilioAuthToken: sheetSettingsObj.twilioAuthToken || settings.twilioAuthToken,
+            twilioFromNumber: sheetSettingsObj.twilioFromNumber || settings.twilioFromNumber,
+            twilioWhatsAppNumber: sheetSettingsObj.twilioWhatsAppNumber || settings.twilioWhatsAppNumber
           };
 
           // Save settings cache locally
