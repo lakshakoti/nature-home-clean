@@ -11,16 +11,18 @@
  * - Copy the Web App URL and paste it in the Nature Home Clean Settings page.
  */
 
-// Target Google Sheet ID (from your spreadsheet link)
-const SPREADSHEET_ID = "1pj4WTs-uZztay21V4b1dQ3ONWwT5BRDpZD3RbddvZg0";
-// Target Google Drive Folder ID to store database Spreadsheet
-const FOLDER_ID = "171lKHq0OduwCTBpmhayO-Bai95hDsM2V";
+// Target Google Sheet ID (from your spreadsheet link - optional)
+// Leave empty ("") if you want the script to automatically find or create a database sheet inside your Google Drive
+const SPREADSHEET_ID = "";
+// Target Google Drive Folder ID to store database Spreadsheet (optional)
+// Leave empty ("") if you want the sheet to be stored in your main Google Drive root directory
+const FOLDER_ID = "";
 const DATABASE_NAME = "Nature Home Clean Services Database";
 
 // Helper to open or create Spreadsheet database in the target folder/ID
 function getSpreadsheet() {
   // Option 1: Open specific Spreadsheet by ID if configured
-  if (SPREADSHEET_ID && SPREADSHEET_ID.trim() !== "") {
+  if (typeof SPREADSHEET_ID !== 'undefined' && SPREADSHEET_ID && SPREADSHEET_ID.trim() !== "") {
     try {
       return SpreadsheetApp.openById(SPREADSHEET_ID);
     } catch (e) {
@@ -29,7 +31,7 @@ function getSpreadsheet() {
   }
 
   // Option 2: Search or Create inside specified Folder
-  if (FOLDER_ID && FOLDER_ID.trim() !== "") {
+  if (typeof FOLDER_ID !== 'undefined' && FOLDER_ID && FOLDER_ID.trim() !== "") {
     try {
       const folder = DriveApp.getFolderById(FOLDER_ID);
       const files = folder.getFilesByName(DATABASE_NAME);
@@ -55,11 +57,25 @@ function getSpreadsheet() {
     }
   }
   
-  // Fallback: Use spreadsheet the script is bound to (if bound)
+  // Option 3: Use spreadsheet the script is bound to (if bound)
   try {
-    return SpreadsheetApp.getActiveSpreadsheet();
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
   } catch (err) {
-    throw new Error("No Google Drive Folder ID configured and script is not bound to a spreadsheet.");
+    // Ignore bound errors and try auto-creation in Google Drive Root
+  }
+
+  // Option 4: Auto-create or find database inside the user's main Google Drive root directory
+  try {
+    const files = DriveApp.getRootFolder().getFilesByName(DATABASE_NAME);
+    if (files.hasNext()) {
+      const file = files.next();
+      return SpreadsheetApp.openById(file.getId());
+    } else {
+      return SpreadsheetApp.create(DATABASE_NAME);
+    }
+  } catch (e) {
+    throw new Error("Could not access or create Google Sheets database: " + e.toString());
   }
 }
 
