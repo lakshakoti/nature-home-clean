@@ -47,12 +47,21 @@ jobs:
         run: chmod +x android/gradlew
         working-directory: .
 
-      - name: Build Android Debug APK
-        run: ./gradlew assembleDebug
+      - name: Generate Release Keystore
+        run: keytool -genkeypair -v -keystore android/app/my-release-key.keystore -alias natureclean -keyalg RSA -keysize 2048 -validity 10000 -storepass natureclean123 -keypass natureclean123 -dname "CN=NatureClean, O=NatureHomeClean, C=IN"
+
+      - name: Build Android APKs
+        run: ./gradlew assembleDebug assembleRelease
         working-directory: android
 
-      - name: Upload APK Artifacts
+      - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: nature-home-clean-apk
+          name: nature-home-clean-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload Signed Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nature-home-clean-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
