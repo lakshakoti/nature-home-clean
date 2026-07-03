@@ -369,6 +369,22 @@ function App() {
     }
   };
 
+  const handleAutoSaveOnNotify = async () => {
+    if (!editingBooking || !editingBooking.bookingId) return;
+    try {
+      const updates = {
+        status: editStatus as any,
+        cleanerAssigned: editCleaner,
+        adminNotes: editNotes
+      };
+      await GoogleSheetsBridge.updateBooking(editingBooking.bookingId, updates);
+      const data = await GoogleSheetsBridge.fetchData();
+      setBookings(data.bookings);
+    } catch (err) {
+      console.error("Auto-save on notification click failed:", err);
+    }
+  };
+
   // Save Settings from settings panel
   const handleSaveSettings = () => {
     const updatedSettings: CompanySettings = {
@@ -1298,6 +1314,9 @@ function App() {
                                         setEditCleaner("");
                                       } else {
                                         setEditCleaner(val);
+                                        if (val !== "Unassigned" && editStatus === "Pending") {
+                                          setEditStatus("Confirmed");
+                                        }
                                       }
                                     }}
                                     className="form-control"
@@ -1317,7 +1336,12 @@ function App() {
                                         type="text" 
                                         placeholder="Enter custom cleaner name..."
                                         value={editCleaner} 
-                                        onChange={(e) => setEditCleaner(e.target.value)}
+                                        onChange={(e) => {
+                                          setEditCleaner(e.target.value);
+                                          if (e.target.value.trim().length > 0 && editStatus === "Pending") {
+                                            setEditStatus("Confirmed");
+                                          }
+                                        }}
                                         className="form-control"
                                       />
                                     </div>
@@ -1328,7 +1352,12 @@ function App() {
                                   type="text" 
                                   placeholder="e.g. Jane Smith"
                                   value={editCleaner} 
-                                  onChange={(e) => setEditCleaner(e.target.value)}
+                                  onChange={(e) => {
+                                    setEditCleaner(e.target.value);
+                                    if (e.target.value.trim().length > 0 && editStatus === "Pending") {
+                                      setEditStatus("Confirmed");
+                                    }
+                                  }}
                                   className="form-control"
                                 />
                               )}
@@ -1344,6 +1373,7 @@ function App() {
                               href={`https://wa.me/${editingBooking.customerPhone.replace(/[\s\-\(\)\+]/g, '').length === 10 ? '91' : ''}${editingBooking.customerPhone.replace(/[\s\-\(\)\+]/g, '')}?text=${encodeURIComponent(
                                 `Hi ${editingBooking.customerName}, your booking ${editingBooking.bookingId} for ${editingBooking.serviceName} on ${editingBooking.date} @ ${editingBooking.timeSlot} is updated to status: ${editStatus}. Assigned cleaner: ${editCleaner}. Total: ${settings.currencySymbol}${editingBooking.totalPrice}. Thank you! - ${settings.companyName}`
                               )}`}
+                              onClick={handleAutoSaveOnNotify}
                               target="_blank"
                               rel="noreferrer"
                               className="btn btn-outline py-2 text-xs flex items-center justify-center gap-1.5 border-emerald-500 text-emerald-700 hover:bg-emerald-50/50"
@@ -1356,6 +1386,7 @@ function App() {
                               href={`https://wa.me/?text=${encodeURIComponent(
                                 `Hi, you are assigned to booking ${editingBooking.bookingId} for ${editingBooking.customerName} (${editingBooking.customerPhone}) on ${editingBooking.date} @ ${editingBooking.timeSlot}. Service: ${editingBooking.serviceName}. Address: ${editingBooking.customerAddress}. Notes: ${editNotes || 'None'}`
                               )}`}
+                              onClick={handleAutoSaveOnNotify}
                               target="_blank"
                               rel="noreferrer"
                               className="btn btn-outline py-2 text-xs flex items-center justify-center gap-1.5 border-blue-500 text-blue-700 hover:bg-blue-50/50"
