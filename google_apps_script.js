@@ -199,7 +199,8 @@ function initializeSheets() {
       ["twilioAccountSid", ""],
       ["twilioAuthToken", ""],
       ["twilioFromNumber", ""],
-      ["twilioWhatsAppNumber", ""]
+      ["twilioWhatsAppNumber", ""],
+      ["cleanersList", "Jane Smith (+91 98765 43210)\nJohn Doe (+91 87654 32109)\nAlice Johnson (+91 76543 21098)"]
     ];
     
     defaultSettings.forEach(row => settingsSheet.appendRow(row));

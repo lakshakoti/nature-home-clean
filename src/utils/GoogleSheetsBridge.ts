@@ -39,6 +39,7 @@ export interface CompanySettings {
   twilioAuthToken?: string;
   twilioFromNumber?: string;
   twilioWhatsAppNumber?: string;
+  cleanersList?: string;
 }
 
 const DEFAULT_SERVICES: Service[] = [
@@ -197,7 +198,8 @@ export class GoogleSheetsBridge {
             twilioAccountSid: sheetSettingsObj.twilioAccountSid || settings.twilioAccountSid,
             twilioAuthToken: sheetSettingsObj.twilioAuthToken || settings.twilioAuthToken,
             twilioFromNumber: sheetSettingsObj.twilioFromNumber || settings.twilioFromNumber,
-            twilioWhatsAppNumber: sheetSettingsObj.twilioWhatsAppNumber || settings.twilioWhatsAppNumber
+            twilioWhatsAppNumber: sheetSettingsObj.twilioWhatsAppNumber || settings.twilioWhatsAppNumber,
+            cleanersList: sheetSettingsObj.cleanersList || settings.cleanersList
           };
 
           // Save settings cache locally

@@ -82,6 +82,7 @@ function App() {
   const [settingsTwilioTokenInput, setSettingsTwilioTokenInput] = useState("");
   const [settingsTwilioFromInput, setSettingsTwilioFromInput] = useState("");
   const [settingsTwilioWhatsAppInput, setSettingsTwilioWhatsAppInput] = useState("");
+  const [settingsCleanersInput, setSettingsCleanersInput] = useState("");
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSyncingOffline, setIsSyncingOffline] = useState(false);
 
@@ -142,6 +143,7 @@ function App() {
       setSettingsTwilioTokenInput(data.settings.twilioAuthToken || "");
       setSettingsTwilioFromInput(data.settings.twilioFromNumber || "");
       setSettingsTwilioWhatsAppInput(data.settings.twilioWhatsAppNumber || "");
+      setSettingsCleanersInput(data.settings.cleanersList || "Jane Smith (+91 98765 43210)\nJohn Doe (+91 87654 32109)\nAlice Johnson (+91 76543 21098)");
     } catch (error) {
       console.error("Error loading initial data:", error);
     } finally {
@@ -382,7 +384,8 @@ function App() {
       twilioAccountSid: settingsTwilioSidInput,
       twilioAuthToken: settingsTwilioTokenInput,
       twilioFromNumber: settingsTwilioFromInput,
-      twilioWhatsAppNumber: settingsTwilioWhatsAppInput
+      twilioWhatsAppNumber: settingsTwilioWhatsAppInput,
+      cleanersList: settingsCleanersInput
     };
     
     GoogleSheetsBridge.saveSettingsLocally(updatedSettings);
@@ -1270,16 +1273,68 @@ function App() {
                         </div>
 
                         {/* Cleaner Field */}
-                        <div className="form-group">
-                          <label>Assign Cleaner</label>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. Jane Smith"
-                            value={editCleaner} 
-                            onChange={(e) => setEditCleaner(e.target.value)}
-                            className="form-control"
-                          />
-                        </div>
+                        {(() => {
+                          const cleaners = settings.cleanersList
+                            ? settings.cleanersList
+                                .split("\n")
+                                .map(c => c.trim())
+                                .filter(c => c.length > 0)
+                            : [];
+                          
+                          return (
+                            <div className="form-group text-left">
+                              <label>Assign Cleaner</label>
+                              {cleaners.length > 0 ? (
+                                <>
+                                  <select
+                                    value={
+                                      cleaners.includes(editCleaner) || editCleaner === "Unassigned"
+                                        ? editCleaner
+                                        : "Other"
+                                    }
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === "Other") {
+                                        setEditCleaner("");
+                                      } else {
+                                        setEditCleaner(val);
+                                      }
+                                    }}
+                                    className="form-control"
+                                  >
+                                    <option value="Unassigned">Unassigned</option>
+                                    {cleaners.map((cleanerName, idx) => (
+                                      <option key={idx} value={cleanerName}>
+                                        {cleanerName}
+                                      </option>
+                                    ))}
+                                    <option value="Other">Custom Name / Type Manually...</option>
+                                  </select>
+                                  
+                                  {(!cleaners.includes(editCleaner) && editCleaner !== "Unassigned") && (
+                                    <div className="mt-2 animate-fade-in">
+                                      <input 
+                                        type="text" 
+                                        placeholder="Enter custom cleaner name..."
+                                        value={editCleaner} 
+                                        onChange={(e) => setEditCleaner(e.target.value)}
+                                        className="form-control"
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <input 
+                                  type="text" 
+                                  placeholder="e.g. Jane Smith"
+                                  value={editCleaner} 
+                                  onChange={(e) => setEditCleaner(e.target.value)}
+                                  className="form-control"
+                                />
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Automated/Manual Mobile Notifications */}
                         <div className="mb-4">
@@ -1574,6 +1629,29 @@ function App() {
                         className="form-control"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Section: Cleaner List Configuration */}
+                <div className="premium-card">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    {renderIcon("UserCheck", "w-4 h-4 text-primary")} Cleaners & Service Staff List
+                  </h3>
+                  <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                    Add the names of your cleaning staff (one per line). These will populate a wowed selection dropdown in your Admin dashboard to quickly assign them to bookings. You can optionally add their phone numbers in brackets.
+                  </p>
+                  
+                  <div className="form-group text-left">
+                    <label htmlFor="settings-cleaners-list">Cleaner Names (one per line)</label>
+                    <textarea 
+                      id="settings-cleaners-list"
+                      rows={4}
+                      placeholder="e.g.&#10;Jane Smith (+91 98765 43210)&#10;John Doe (+91 87654 32109)"
+                      value={settingsCleanersInput} 
+                      onChange={(e) => setSettingsCleanersInput(e.target.value)}
+                      className="form-control text-left"
+                      style={{ fontFamily: "monospace", fontSize: "12px", lineHeight: "1.5" }}
+                    />
                   </div>
                 </div>
 
