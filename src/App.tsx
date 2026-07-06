@@ -542,7 +542,7 @@ function App() {
       {/* HEADER NAVBAR */}
       <header className="app-header">
         <h1 className="flex items-center gap-2">
-          <img src="/logo.png" alt="NHC Logo" className="w-8 h-8 rounded-full object-cover border border-emerald-200 shadow-sm" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="NHC Logo" className="w-8 h-8 rounded-full object-cover border border-emerald-200 shadow-sm" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <span>{settings.companyName}</span>
         </h1>
         {settings.googleAppsScriptUrl ? (
@@ -585,7 +585,7 @@ function App() {
 
                 {/* Team Uniform Showcase */}
                 <div className="premium-card text-left p-0 overflow-hidden mb-4 bg-white border border-gray-150">
-                  <img src="/cleaner_team.png" alt="Nature Home Cleaning Services Team" className="w-full h-64 object-cover object-top" />
+                  <img src={`${import.meta.env.BASE_URL}cleaner_team.png`} alt="Nature Home Cleaning Services Team" className="w-full h-64 object-cover object-top" />
                   <div className="p-4">
                     <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
                       {renderIcon("UserCheck", "w-4 h-4 text-primary")}
@@ -1250,7 +1250,7 @@ function App() {
                   /* Admin Password Lock Screen */
                   <div className="premium-card text-center max-w-sm mx-auto my-8">
                     <div className="inline-block p-1 rounded-full border border-emerald-100 shadow-sm bg-emerald-50 mb-3">
-                      <img src="/logo.png" alt="NHC Logo" className="w-16 h-16 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      <img src={`${import.meta.env.BASE_URL}logo.png`} alt="NHC Logo" className="w-16 h-16 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     </div>
                     <h3 className="text-md font-bold text-gray-800 mb-1">Owner Admin Dashboard</h3>
                     <p className="text-xs text-muted mb-4">Access restricted. Enter your Username and Security Passcode.</p>
@@ -1604,7 +1604,7 @@ function App() {
                   /* Admin Password Lock Screen for Settings */
                   <div className="premium-card text-center max-w-sm mx-auto my-8">
                     <div className="inline-block p-1 rounded-full border border-emerald-100 shadow-sm bg-emerald-50 mb-3">
-                      <img src="/logo.png" alt="NHC Logo" className="w-16 h-16 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      <img src={`${import.meta.env.BASE_URL}logo.png`} alt="NHC Logo" className="w-16 h-16 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     </div>
                     <h3 className="text-md font-bold text-gray-800 mb-1">Owner Admin Settings</h3>
                     <p className="text-xs text-muted mb-4">Access restricted. Enter your Username and Security Passcode to configure settings.</p>
