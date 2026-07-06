@@ -50,6 +50,7 @@ function App() {
   
   // Wizard flow results
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
+  const [createdBookingPrice, setCreatedBookingPrice] = useState<number>(0);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
   // Track Booking States
@@ -73,6 +74,7 @@ function App() {
   const [settingsNameInput, setSettingsNameInput] = useState("");
   const [settingsPhoneInput, setSettingsPhoneInput] = useState("");
   const [settingsEmailInput, setSettingsEmailInput] = useState("");
+  const [settingsUsernameInput, setSettingsUsernameInput] = useState("");
   const [settingsPassInput, setSettingsPassInput] = useState("");
   const [settingsCurrencyInput, setSettingsCurrencyInput] = useState("");
   const [settingsRecoveryQuestionInput, setSettingsRecoveryQuestionInput] = useState("");
@@ -83,6 +85,10 @@ function App() {
   const [settingsTwilioFromInput, setSettingsTwilioFromInput] = useState("");
   const [settingsTwilioWhatsAppInput, setSettingsTwilioWhatsAppInput] = useState("");
   const [settingsCleanersInput, setSettingsCleanersInput] = useState("");
+  const [settingsUpiIdInput, setSettingsUpiIdInput] = useState("");
+  const [settingsPayeeNameInput, setSettingsPayeeNameInput] = useState("");
+  const [adminUsernameInput, setAdminUsernameInput] = useState("");
+  const [editPaymentStatus, setEditPaymentStatus] = useState<"Unpaid" | "Paid">("Unpaid");
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isSyncingOffline, setIsSyncingOffline] = useState(false);
 
@@ -134,6 +140,7 @@ function App() {
       setSettingsNameInput(data.settings.companyName);
       setSettingsPhoneInput(data.settings.companyPhone);
       setSettingsEmailInput(data.settings.companyEmail);
+      setSettingsUsernameInput(data.settings.adminUsername || "admin");
       setSettingsPassInput(data.settings.adminPasscode);
       setSettingsCurrencyInput(data.settings.currencySymbol);
       setSettingsRecoveryQuestionInput(data.settings.recoveryQuestion || "What was the name of your first school?");
@@ -144,6 +151,8 @@ function App() {
       setSettingsTwilioFromInput(data.settings.twilioFromNumber || "");
       setSettingsTwilioWhatsAppInput(data.settings.twilioWhatsAppNumber || "");
       setSettingsCleanersInput(data.settings.cleanersList || "Jane Smith (+91 98765 43210)\nJohn Doe (+91 87654 32109)\nAlice Johnson (+91 76543 21098)");
+      setSettingsUpiIdInput(data.settings.upiId || "9676328206@ybl");
+      setSettingsPayeeNameInput(data.settings.payeeName || "Nature Home Clean Services");
     } catch (error) {
       console.error("Error loading initial data:", error);
     } finally {
@@ -210,6 +219,7 @@ function App() {
       const result = await GoogleSheetsBridge.createBooking(newBooking);
       if (result.success && result.bookingId) {
         setCreatedBookingId(result.bookingId);
+        setCreatedBookingPrice(newBooking.totalPrice);
         setBookingStep(5); // Show success splash
         
         // Refresh local listings
@@ -224,6 +234,14 @@ function App() {
     } finally {
       setIsSubmittingBooking(false);
     }
+  };
+
+  // Helper to generate UPI payment deep link URL
+  const getUpiUrl = (amount: number, bookingId: string) => {
+    const vpa = settings.upiId || "9676328206@ybl";
+    const payeeName = settings.payeeName || settings.companyName || "Nature Home Clean Services";
+    const note = `Booking ${bookingId}`;
+    return `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
   };
 
   // Start Booking Flow
@@ -252,6 +270,7 @@ function App() {
     setCustAddress("");
     setCustNotes("");
     setCreatedBookingId(null);
+    setCreatedBookingPrice(0);
     setBookingStep(1);
   };
 
@@ -274,14 +293,17 @@ function App() {
     setTrackResult(matches);
   };
 
-  // Admin Passcode authentication
+  // Admin Username & Passcode authentication
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPassInput === settings.adminPasscode) {
+    const expectedUsername = (settings.adminUsername || "admin").toLowerCase().trim();
+    const expectedPassword = settings.adminPasscode;
+    
+    if (adminUsernameInput.toLowerCase().trim() === expectedUsername && adminPassInput === expectedPassword) {
       setIsAdminAuthenticated(true);
       setAdminAuthError("");
     } else {
-      setAdminAuthError("Invalid passcode. Please check Settings or try again.");
+      setAdminAuthError("Invalid username or password. Please try again.");
     }
   };
 
@@ -339,6 +361,7 @@ function App() {
     setEditStatus(booking.status || "Pending");
     setEditCleaner(booking.cleanerAssigned || "Unassigned");
     setEditNotes(booking.adminNotes || "");
+    setEditPaymentStatus(booking.paymentStatus || "Unpaid");
   };
 
   const handleSaveAdminEdit = async () => {
@@ -349,7 +372,8 @@ function App() {
       const updates = {
         status: editStatus as any,
         cleanerAssigned: editCleaner,
-        adminNotes: editNotes
+        adminNotes: editNotes,
+        paymentStatus: editPaymentStatus
       };
 
       const result = await GoogleSheetsBridge.updateBooking(editingBooking.bookingId, updates);
@@ -375,7 +399,8 @@ function App() {
       const updates = {
         status: editStatus as any,
         cleanerAssigned: editCleaner,
-        adminNotes: editNotes
+        adminNotes: editNotes,
+        paymentStatus: editPaymentStatus
       };
       await GoogleSheetsBridge.updateBooking(editingBooking.bookingId, updates);
       const data = await GoogleSheetsBridge.fetchData();
@@ -386,11 +411,12 @@ function App() {
   };
 
   // Save Settings from settings panel
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     const updatedSettings: CompanySettings = {
       companyName: settingsNameInput,
       companyPhone: settingsPhoneInput,
       companyEmail: settingsEmailInput,
+      adminUsername: settingsUsernameInput,
       adminPasscode: settingsPassInput,
       currencySymbol: settingsCurrencyInput,
       googleAppsScriptUrl: settingsUrlInput,
@@ -401,19 +427,51 @@ function App() {
       twilioAuthToken: settingsTwilioTokenInput,
       twilioFromNumber: settingsTwilioFromInput,
       twilioWhatsAppNumber: settingsTwilioWhatsAppInput,
-      cleanersList: settingsCleanersInput
+      cleanersList: settingsCleanersInput,
+      upiId: settingsUpiIdInput,
+      payeeName: settingsPayeeNameInput
     };
     
-    GoogleSheetsBridge.saveSettingsLocally(updatedSettings);
-    setSettings(updatedSettings);
-    setSyncMessage({ type: "success", text: "Settings saved successfully locally! Connecting database..." });
-    
-    // Automatically trigger test connection if URL is set
-    if (updatedSettings.googleAppsScriptUrl) {
-      testConnectionUrl(updatedSettings.googleAppsScriptUrl);
+    setIsTestingConnection(true);
+    setSyncMessage(null);
+    try {
+      const result = await GoogleSheetsBridge.saveSettings(updatedSettings);
+      setSettings(updatedSettings);
+      
+      if (result.success) {
+        setSyncMessage({ type: "success", text: "Settings saved and synced to Google Sheets successfully!" });
+        alert("Settings saved successfully both locally and in Google Sheets database!");
+        
+        // Auto trigger data reload and check connection
+        if (updatedSettings.googleAppsScriptUrl) {
+          loadAllData();
+          // Prompt to sync offline bookings if there are any
+          const offlineBookingsStr = localStorage.getItem("nhc_bookings");
+          if (offlineBookingsStr) {
+            try {
+              const bookings = JSON.parse(offlineBookingsStr);
+              if (bookings.length > 0) {
+                const confirmSync = window.confirm(`You have ${bookings.length} local bookings. Would you like to sync them to your newly connected Google Sheet database now?`);
+                if (confirmSync) {
+                  handleSyncOfflineData();
+                }
+              }
+            } catch (e) {
+              // Ignore
+            }
+          }
+        }
+      } else {
+        setSyncMessage({ type: "error", text: `Saved locally, but failed to upload to Google Sheet: ${result.error}` });
+        alert(`Settings saved locally, but failed to upload to Google Sheets.\n\nError: ${result.error}\n\nPlease check your Apps Script URL.`);
+      }
+    } catch (err: any) {
+      setSyncMessage({ type: "error", text: "Saved locally, but failed to connect to Google Sheets." });
+      alert("Settings saved locally, but failed to connect to Google Sheets. Make sure your Apps Script Web App URL is correct.");
+    } finally {
+      setIsTestingConnection(false);
+      setTimeout(() => setSyncMessage(null), 5000);
     }
-    
-    setTimeout(() => setSyncMessage(null), 5000);
   };
 
   // Test connection to Google Apps Script
@@ -483,8 +541,8 @@ function App() {
     <div className="app-container">
       {/* HEADER NAVBAR */}
       <header className="app-header">
-        <h1>
-          {renderIcon("Sparkles", "w-5 h-5 text-accent animate-pulse")}
+        <h1 className="flex items-center gap-2">
+          <img src="/logo.png" alt="NHC Logo" className="w-8 h-8 rounded-full object-cover border border-emerald-200 shadow-sm" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <span>{settings.companyName}</span>
         </h1>
         {settings.googleAppsScriptUrl ? (
@@ -999,6 +1057,49 @@ function App() {
                         <span className="text-xl font-extrabold text-primary tracking-widest">{createdBookingId}</span>
                       </div>
 
+                      {settings.upiId && (
+                        <div className="premium-card border-indigo-150 bg-indigo-50/20 text-left p-4 my-6">
+                          <h4 className="text-xs font-bold text-indigo-950 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            {renderIcon("Wallet", "w-4 h-4 text-indigo-600")}
+                            Pay Securely via UPI Apps
+                          </h4>
+                          <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">
+                            Open any UPI app on your phone (Google Pay, PhonePe, Paytm, BHIM) to transfer the amount instantly.
+                          </p>
+
+                          <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-3 rounded-lg border border-indigo-100">
+                            {/* QR Code */}
+                            <div className="flex-shrink-0 bg-white p-1.5 border border-gray-150 rounded mx-auto sm:mx-0">
+                              <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(getUpiUrl(createdBookingPrice, createdBookingId || ""))}`} 
+                                alt="Payment UPI QR Code" 
+                                className="w-28 h-28" 
+                              />
+                            </div>
+                            <div className="flex-1 w-full text-center sm:text-left">
+                              <span className="text-[10px] text-gray-400 block font-bold uppercase">Payee Name</span>
+                              <span className="text-xs font-bold text-gray-700 block mb-2">{settings.payeeName || settings.companyName}</span>
+                              
+                              <span className="text-[10px] text-gray-400 block font-bold uppercase">UPI VPA ID</span>
+                              <code className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded break-all">{settings.upiId}</code>
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            <a 
+                              href={getUpiUrl(createdBookingPrice, createdBookingId || "")}
+                              className="btn btn-primary bg-indigo-600 hover:bg-indigo-700 text-white w-full py-2.5 rounded-lg flex items-center justify-center gap-2 font-bold text-xs shadow-sm"
+                            >
+                              {renderIcon("Wallet", "w-4 h-4")}
+                              Pay ₹{createdBookingPrice} via UPI App
+                            </a>
+                            <p className="text-[10px] text-center text-gray-400 mt-2 italic">
+                              * Once paid, please share the transaction screenshot on WhatsApp with our team for verification.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="text-xs text-left bg-emerald-50 text-emerald-900 p-3 rounded-lg border border-emerald-100 mb-6 space-y-1">
                         <p className="font-bold">What happens next?</p>
                         <p>1. Our team will review the appointment schedule.</p>
@@ -1088,6 +1189,45 @@ function App() {
                               <span className="block text-gray-400 font-bold">Cleaner Assigned</span>
                               <span className="font-semibold text-gray-800">{booking.cleanerAssigned || "Unassigned"}</span>
                             </div>
+                            <div>
+                              <span className="block text-gray-400 font-bold">Payment Status</span>
+                              <span className={`badge ${booking.paymentStatus === "Paid" ? "badge-completed" : "badge-cancelled"}`}>
+                                {booking.paymentStatus || "Unpaid"}
+                              </span>
+                            </div>
+                            {(!booking.paymentStatus || booking.paymentStatus === "Unpaid") && settings.upiId && (
+                              <div className="col-span-2 mt-2 pt-2 border-t border-dashed border-gray-150">
+                                <div className="flex gap-2">
+                                  <a 
+                                    href={getUpiUrl(booking.totalPrice, booking.bookingId || "")}
+                                    className="btn btn-primary bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 px-3 rounded flex items-center justify-center gap-1 font-bold text-[11px] shadow-sm flex-1"
+                                  >
+                                    {renderIcon("Wallet", "w-3.5 h-3.5")}
+                                    Pay ₹{booking.totalPrice} via UPI App
+                                  </a>
+                                  
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      const qrEl = document.getElementById(`qr-${booking.bookingId}`);
+                                      if (qrEl) qrEl.classList.toggle('hidden');
+                                    }}
+                                    className="btn btn-outline py-1.5 px-2.5 rounded text-[11px] font-semibold text-indigo-700 border-indigo-200"
+                                  >
+                                    Show QR
+                                  </button>
+                                </div>
+                                
+                                <div id={`qr-${booking.bookingId}`} className="hidden text-center mt-3 p-3 bg-indigo-50/50 border border-indigo-100 rounded">
+                                  <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(getUpiUrl(booking.totalPrice, booking.bookingId || ""))}`} 
+                                    alt="UPI QR Code" 
+                                    className="w-28 h-28 mx-auto bg-white p-1 rounded border border-gray-150" 
+                                  />
+                                  <p className="text-[10px] text-gray-400 mt-1 italic">Scan QR code using Google Pay, PhonePe, Paytm, or BHIM to pay</p>
+                                </div>
+                              </div>
+                            )}
                             {booking.adminNotes && (
                               <div className="col-span-2 bg-slate-50 p-2 rounded border border-gray-100 text-[11px] italic">
                                 <span className="font-bold text-gray-500 block not-italic">Notes:</span>
@@ -1109,22 +1249,36 @@ function App() {
                 {!isAdminAuthenticated ? (
                   /* Admin Password Lock Screen */
                   <div className="premium-card text-center max-w-sm mx-auto my-8">
-                    <div className="inline-block bg-emerald-50 text-primary p-3 rounded-full mb-3">
-                      {renderIcon("Key", "w-8 h-8")}
+                    <div className="inline-block p-1 rounded-full border border-emerald-100 shadow-sm bg-emerald-50 mb-3">
+                      <img src="/logo.png" alt="NHC Logo" className="w-16 h-16 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     </div>
                     <h3 className="text-md font-bold text-gray-800 mb-1">Owner Admin Dashboard</h3>
-                    <p className="text-xs text-muted mb-4">Access restricted. Enter company security passcode.</p>
+                    <p className="text-xs text-muted mb-4">Access restricted. Enter your Username and Security Passcode.</p>
 
                     <form onSubmit={handleAdminLogin} className="space-y-4">
                       <div className="form-group text-left">
-                        <label htmlFor="admin-passcode">Security Passcode</label>
+                        <label htmlFor="admin-username">Admin Username</label>
+                        <input
+                          id="admin-username"
+                          type="text"
+                          required
+                          placeholder="e.g. admin"
+                          value={adminUsernameInput}
+                          onChange={(e) => setAdminUsernameInput(e.target.value)}
+                          className="form-control"
+                        />
+                      </div>
+                      
+                      <div className="form-group text-left">
+                        <label htmlFor="admin-passcode">Security Password</label>
                         <input
                           id="admin-passcode"
                           type="password"
+                          required
                           placeholder="e.g. admin123"
                           value={adminPassInput}
                           onChange={(e) => setAdminPassInput(e.target.value)}
-                          className="form-control text-center"
+                          className="form-control"
                         />
                       </div>
                       
@@ -1140,7 +1294,7 @@ function App() {
                           }}
                           className="text-primary hover:underline font-semibold focus:outline-none"
                         >
-                          Forgot passcode?
+                          Forgot credentials?
                         </button>
                       </div>
                       
@@ -1241,15 +1395,22 @@ function App() {
                                 <p className="text-gray-400 text-[10px]">{b.date} @ {b.timeSlot.split(" ")[0]}</p>
                               </div>
                               <div className="text-right flex flex-col items-end gap-1">
-                                <span className={`badge py-0.5 px-2 text-[10px] ${
-                                  b.status === "Completed" ? "badge-completed" :
-                                  b.status === "In Progress" ? "badge-progress" :
-                                  b.status === "Confirmed" ? "badge-confirmed" :
-                                  b.status === "Cancelled" ? "badge-cancelled" :
-                                  "badge-pending"
-                                }`}>
-                                  {b.status}
-                                </span>
+                                <div className="flex gap-1.5">
+                                  <span className={`badge py-0.5 px-1.5 text-[9px] ${
+                                    b.paymentStatus === "Paid" ? "badge-completed" : "badge-cancelled"
+                                  }`}>
+                                    {b.paymentStatus || "Unpaid"}
+                                  </span>
+                                  <span className={`badge py-0.5 px-1.5 text-[9px] ${
+                                    b.status === "Completed" ? "badge-completed" :
+                                    b.status === "In Progress" ? "badge-progress" :
+                                    b.status === "Confirmed" ? "badge-confirmed" :
+                                    b.status === "Cancelled" ? "badge-cancelled" :
+                                    "badge-pending"
+                                  }`}>
+                                    {b.status}
+                                  </span>
+                                </div>
                                 <span className="font-bold text-gray-800">{settings.currencySymbol}{b.totalPrice}</span>
                               </div>
                             </div>
@@ -1397,6 +1558,19 @@ function App() {
                           </div>
                         </div>
 
+                        {/* Payment Status */}
+                        <div className="form-group text-left">
+                          <label>Payment Status</label>
+                          <select 
+                            value={editPaymentStatus} 
+                            onChange={(e) => setEditPaymentStatus(e.target.value as any)}
+                            className="form-control"
+                          >
+                            <option value="Unpaid">Unpaid</option>
+                            <option value="Paid">Paid</option>
+                          </select>
+                        </div>
+
                         {/* Admin Notes */}
                         <div className="form-group">
                           <label>Admin & Cleaner Notes</label>
@@ -1429,22 +1603,36 @@ function App() {
                 {!isAdminAuthenticated ? (
                   /* Admin Password Lock Screen for Settings */
                   <div className="premium-card text-center max-w-sm mx-auto my-8">
-                    <div className="inline-block bg-emerald-50 text-primary p-3 rounded-full mb-3">
-                      {renderIcon("Key", "w-8 h-8")}
+                    <div className="inline-block p-1 rounded-full border border-emerald-100 shadow-sm bg-emerald-50 mb-3">
+                      <img src="/logo.png" alt="NHC Logo" className="w-16 h-16 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     </div>
                     <h3 className="text-md font-bold text-gray-800 mb-1">Owner Admin Settings</h3>
-                    <p className="text-xs text-muted mb-4">Access restricted. Enter company security passcode to configure settings.</p>
+                    <p className="text-xs text-muted mb-4">Access restricted. Enter your Username and Security Passcode to configure settings.</p>
 
                     <form onSubmit={handleAdminLogin} className="space-y-4">
                       <div className="form-group text-left">
-                        <label htmlFor="admin-settings-passcode">Security Passcode</label>
+                        <label htmlFor="admin-settings-username">Admin Username</label>
+                        <input
+                          id="admin-settings-username"
+                          type="text"
+                          required
+                          placeholder="e.g. admin"
+                          value={adminUsernameInput}
+                          onChange={(e) => setAdminUsernameInput(e.target.value)}
+                          className="form-control"
+                        />
+                      </div>
+
+                      <div className="form-group text-left">
+                        <label htmlFor="admin-settings-passcode">Security Password</label>
                         <input
                           id="admin-settings-passcode"
                           type="password"
+                          required
                           placeholder="e.g. admin123"
                           value={adminPassInput}
                           onChange={(e) => setAdminPassInput(e.target.value)}
-                          className="form-control text-center"
+                          className="form-control"
                         />
                       </div>
                       
@@ -1460,7 +1648,7 @@ function App() {
                           }}
                           className="text-primary hover:underline font-semibold focus:outline-none"
                         >
-                          Forgot passcode?
+                          Forgot credentials?
                         </button>
                       </div>
                       
@@ -1521,18 +1709,28 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="form-row-2">
+                  <div className="form-group">
+                    <label>Business Email</label>
+                    <input 
+                      type="email" 
+                      value={settingsEmailInput} 
+                      onChange={(e) => setSettingsEmailInput(e.target.value)}
+                      className="form-control"
+                    />
+                  </div>
+
+                  <div className="form-row-2 mt-2">
                     <div className="form-group">
-                      <label>Business Email</label>
+                      <label>Admin Username</label>
                       <input 
-                        type="email" 
-                        value={settingsEmailInput} 
-                        onChange={(e) => setSettingsEmailInput(e.target.value)}
+                        type="text" 
+                        value={settingsUsernameInput} 
+                        onChange={(e) => setSettingsUsernameInput(e.target.value)}
                         className="form-control"
                       />
                     </div>
                     <div className="form-group">
-                      <label>Admin Passcode</label>
+                      <label>Admin Password / Passcode</label>
                       <input 
                         type="text" 
                         value={settingsPassInput} 
@@ -1605,6 +1803,39 @@ function App() {
                     >
                       {isSyncingOffline ? "Syncing..." : "Sync Offline Data"}
                     </button>
+                  </div>
+                </div>
+
+                {/* Section: UPI Payments Setup */}
+                <div className="premium-card bg-indigo-50/40 border border-indigo-100/60">
+                  <h3 className="text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    {renderIcon("Wallet", "w-4 h-4 text-indigo-600")} UPI Mobile Payments Setup
+                  </h3>
+                  <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                    Set up your business UPI VPA ID (e.g. `9676328206@ybl` or `name@upi`) to let customers pay instantly using any mobile UPI app (Google Pay, PhonePe, Paytm) upon booking confirmation.
+                  </p>
+
+                  <div className="form-row-2 text-left">
+                    <div className="form-group">
+                      <label>Merchant UPI ID (VPA)</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 9676328206@ybl"
+                        value={settingsUpiIdInput} 
+                        onChange={(e) => setSettingsUpiIdInput(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>UPI Payee Name</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Nature Home Clean Services"
+                        value={settingsPayeeNameInput} 
+                        onChange={(e) => setSettingsPayeeNameInput(e.target.value)}
+                        className="form-control"
+                      />
+                    </div>
                   </div>
                 </div>
 

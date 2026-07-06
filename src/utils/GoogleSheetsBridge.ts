@@ -12,6 +12,7 @@ export interface Booking {
   status?: "Pending" | "Confirmed" | "In Progress" | "Completed" | "Cancelled";
   cleanerAssigned?: string;
   adminNotes?: string;
+  paymentStatus?: "Unpaid" | "Paid";
   createdAt?: string;
 }
 
@@ -29,6 +30,7 @@ export interface CompanySettings {
   companyName: string;
   companyPhone: string;
   companyEmail: string;
+  adminUsername?: string;
   adminPasscode: string;
   currencySymbol: string;
   googleAppsScriptUrl?: string;
@@ -40,6 +42,8 @@ export interface CompanySettings {
   twilioFromNumber?: string;
   twilioWhatsAppNumber?: string;
   cleanersList?: string;
+  upiId?: string;
+  payeeName?: string;
 }
 
 const DEFAULT_SERVICES: Service[] = [
@@ -103,11 +107,14 @@ const DEFAULT_SETTINGS: CompanySettings = {
   companyName: "Nature Home Clean Services",
   companyPhone: "+91 96763 28206",
   companyEmail: "info@naturehomeclean.com",
+  adminUsername: "admin",
   adminPasscode: "admin123",
   currencySymbol: "₹",
   recoveryQuestion: "What was the name of your first school?",
   recoveryAnswer: "primary",
-  feedbackVideos: "https://www.youtube.com/watch?v=1s9S4N5h-3A\nhttps://www.youtube.com/watch?v=wX-y0K43o1k"
+  feedbackVideos: "https://www.youtube.com/watch?v=1s9S4N5h-3A\nhttps://www.youtube.com/watch?v=wX-y0K43o1k",
+  upiId: "9676328206@ybl",
+  payeeName: "Nature Home Clean Services"
 };
 
 export class GoogleSheetsBridge {
@@ -130,6 +137,39 @@ export class GoogleSheetsBridge {
   // Save settings locally
   public static saveSettingsLocally(settings: CompanySettings): void {
     localStorage.setItem(`${this.STORAGE_PREFIX}settings`, JSON.stringify(settings));
+  }
+
+  // Save settings locally and remotely to Google Sheets if connected
+  public static async saveSettings(settings: CompanySettings): Promise<{ success: boolean; error?: string }> {
+    // 1. Always save locally first
+    this.saveSettingsLocally(settings);
+
+    // 2. If Google Sheets URL is set, save remotely
+    if (settings.googleAppsScriptUrl && settings.googleAppsScriptUrl.trim() !== "") {
+      try {
+        const response = await fetch(settings.googleAppsScriptUrl, {
+          method: "POST",
+          mode: "cors",
+          headers: {
+            "Content-Type": "text/plain"
+          },
+          body: JSON.stringify({
+            action: "updateSettings",
+            settings: settings
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          return { success: true };
+        } else {
+          return { success: false, error: result.error || "Failed to save settings remotely on Google Sheets." };
+        }
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to make HTTP request to Google Sheets." };
+      }
+    }
+
+    return { success: true };
   }
 
   // Fetch all data (Bookings, Services, Settings)
@@ -189,6 +229,7 @@ export class GoogleSheetsBridge {
             companyName: sheetSettingsObj.companyName || settings.companyName,
             companyPhone: sheetSettingsObj.companyPhone || settings.companyPhone,
             companyEmail: sheetSettingsObj.companyEmail || settings.companyEmail,
+            adminUsername: sheetSettingsObj.adminUsername || settings.adminUsername,
             adminPasscode: sheetSettingsObj.adminPasscode || settings.adminPasscode,
             currencySymbol: sheetSettingsObj.currencySymbol || settings.currencySymbol,
             googleAppsScriptUrl: settings.googleAppsScriptUrl,
@@ -199,7 +240,9 @@ export class GoogleSheetsBridge {
             twilioAuthToken: sheetSettingsObj.twilioAuthToken || settings.twilioAuthToken,
             twilioFromNumber: sheetSettingsObj.twilioFromNumber || settings.twilioFromNumber,
             twilioWhatsAppNumber: sheetSettingsObj.twilioWhatsAppNumber || settings.twilioWhatsAppNumber,
-            cleanersList: sheetSettingsObj.cleanersList || settings.cleanersList
+            cleanersList: sheetSettingsObj.cleanersList || settings.cleanersList,
+            upiId: sheetSettingsObj.upiId || settings.upiId,
+            payeeName: sheetSettingsObj.payeeName || settings.payeeName
           };
 
           // Save settings cache locally

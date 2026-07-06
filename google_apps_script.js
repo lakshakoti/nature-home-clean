@@ -157,9 +157,9 @@ function initializeSheets() {
     bookingsSheet.appendRow([
       "Booking ID", "Date", "Time Slot", "Service Name", "Home Size", 
       "Total Price", "Customer Name", "Customer Email", "Customer Phone", 
-      "Customer Address", "Status", "Cleaner Assigned", "Admin Notes", "Created At"
+      "Customer Address", "Status", "Cleaner Assigned", "Admin Notes", "Payment Status", "Created At"
     ]);
-    bookingsSheet.getRange(1, 1, 1, 14).setFontWeight("bold").setBackground("#d1e7dd");
+    bookingsSheet.getRange(1, 1, 1, 15).setFontWeight("bold").setBackground("#d1e7dd");
   }
   
   // 2. Services Sheet
@@ -194,13 +194,16 @@ function initializeSheets() {
       ["companyName", "Nature Home Clean Services"],
       ["companyPhone", "+91 96763 28206"],
       ["companyEmail", "info@naturehomeclean.com"],
+      ["adminUsername", "admin"],
       ["adminPasscode", "admin123"],
       ["currencySymbol", "₹"],
       ["twilioAccountSid", ""],
       ["twilioAuthToken", ""],
       ["twilioFromNumber", ""],
       ["twilioWhatsAppNumber", ""],
-      ["cleanersList", "Jane Smith (+91 98765 43210)\nJohn Doe (+91 87654 32109)\nAlice Johnson (+91 76543 21098)"]
+      ["cleanersList", "Jane Smith (+91 98765 43210)\nJohn Doe (+91 87654 32109)\nAlice Johnson (+91 76543 21098)"],
+      ["upiId", "9676328206@ybl"],
+      ["payeeName", "Nature Home Clean Services"]
     ];
     
     defaultSettings.forEach(row => settingsSheet.appendRow(row));
@@ -269,6 +272,7 @@ function createBooking(ss, booking) {
     booking.status || "Pending",
     booking.cleanerAssigned || "Unassigned",
     booking.adminNotes || "",
+    booking.paymentStatus || "Unpaid",
     new Date().toISOString()
   ];
   
@@ -289,6 +293,7 @@ function createBooking(ss, booking) {
     status: booking.status || "Pending",
     cleanerAssigned: booking.cleanerAssigned || "Unassigned",
     adminNotes: booking.adminNotes || "",
+    paymentStatus: booking.paymentStatus || "Unpaid",
     createdAt: new Date().toISOString()
   };
   
@@ -377,6 +382,7 @@ function fromCamelCase(key) {
     status: "Status",
     cleanerAssigned: "Cleaner Assigned",
     adminNotes: "Admin Notes",
+    paymentStatus: "Payment Status",
     createdAt: "Created At"
   };
   return mapping[key] || key;
