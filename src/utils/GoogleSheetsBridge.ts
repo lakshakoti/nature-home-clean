@@ -13,6 +13,7 @@ export interface Booking {
   cleanerAssigned?: string;
   adminNotes?: string;
   paymentStatus?: "Unpaid" | "Paid";
+  paymentMethod?: string;
   createdAt?: string;
 }
 
@@ -282,6 +283,7 @@ export class GoogleSheetsBridge {
     booking.status = booking.status || "Pending";
     booking.cleanerAssigned = booking.cleanerAssigned || "Unassigned";
     booking.adminNotes = booking.adminNotes || "";
+    booking.paymentMethod = booking.paymentMethod || "Pay After Work Done";
     booking.createdAt = new Date().toISOString();
 
     // If Google Sheets url is connected, post directly to it

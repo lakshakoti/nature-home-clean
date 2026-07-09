@@ -911,3 +911,38 @@ input:checked + .slider:before {
   margin-top: 16px !important;
 }
 
+/* Payment Method Selection Layout */
+.payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+.payment-method-btn {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-color);
+  background-color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.payment-method-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background-color: rgba(15, 81, 50, 0.02);
+}
+.payment-method-btn.active {
+  border-color: var(--primary);
+  background-color: #f0fdf4;
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.payment-method-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+

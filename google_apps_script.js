@@ -157,9 +157,25 @@ function initializeSheets() {
     bookingsSheet.appendRow([
       "Booking ID", "Date", "Time Slot", "Service Name", "Home Size", 
       "Total Price", "Customer Name", "Customer Email", "Customer Phone", 
-      "Customer Address", "Status", "Cleaner Assigned", "Admin Notes", "Payment Status", "Created At"
+      "Customer Address", "Status", "Cleaner Assigned", "Admin Notes", "Payment Status", "Payment Method", "Created At"
     ]);
-    bookingsSheet.getRange(1, 1, 1, 15).setFontWeight("bold").setBackground("#d1e7dd");
+    bookingsSheet.getRange(1, 1, 1, 16).setFontWeight("bold").setBackground("#d1e7dd");
+  } else {
+    // Auto-upgrade schema for existing databases
+    const lastCol = bookingsSheet.getLastColumn();
+    if (lastCol > 0) {
+      const headersRange = bookingsSheet.getRange(1, 1, 1, lastCol);
+      const headers = headersRange.getValues()[0];
+      if (headers.indexOf("Payment Method") === -1) {
+        const createdAtIdx = headers.indexOf("Created At");
+        if (createdAtIdx !== -1) {
+          bookingsSheet.insertColumnBefore(createdAtIdx + 1);
+          bookingsSheet.getRange(1, createdAtIdx + 1).setValue("Payment Method").setFontWeight("bold").setBackground("#d1e7dd");
+        } else {
+          bookingsSheet.getRange(1, lastCol + 1).setValue("Payment Method").setFontWeight("bold").setBackground("#d1e7dd");
+        }
+      }
+    }
   }
   
   // 2. Services Sheet
@@ -273,6 +289,7 @@ function createBooking(ss, booking) {
     booking.cleanerAssigned || "Unassigned",
     booking.adminNotes || "",
     booking.paymentStatus || "Unpaid",
+    booking.paymentMethod || "Pay After Work Done",
     new Date().toISOString()
   ];
   
@@ -294,6 +311,7 @@ function createBooking(ss, booking) {
     cleanerAssigned: booking.cleanerAssigned || "Unassigned",
     adminNotes: booking.adminNotes || "",
     paymentStatus: booking.paymentStatus || "Unpaid",
+    paymentMethod: booking.paymentMethod || "Pay After Work Done",
     createdAt: new Date().toISOString()
   };
   
@@ -383,6 +401,7 @@ function fromCamelCase(key) {
     cleanerAssigned: "Cleaner Assigned",
     adminNotes: "Admin Notes",
     paymentStatus: "Payment Status",
+    paymentMethod: "Payment Method",
     createdAt: "Created At"
   };
   return mapping[key] || key;
@@ -440,6 +459,10 @@ function sendNotifications(booking, type) {
                   <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold; color: #198754;">${currencySymbol}${booking.totalPrice}</td>
                 </tr>
                 <tr>
+                  <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Payment Mode</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6;">${booking.paymentMethod || "Pay After Work Done"}</td>
+                </tr>
+                <tr style="background-color: #f8f9fa;">
                   <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: bold;">Address</td>
                   <td style="padding: 10px; border: 1px solid #dee2e6;">${booking.customerAddress}</td>
                 </tr>

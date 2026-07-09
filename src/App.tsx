@@ -1806,38 +1806,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* Section: UPI Payments Setup */}
-                <div className="premium-card bg-indigo-50/40 border border-indigo-100/60">
-                  <h3 className="text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    {renderIcon("Wallet", "w-4 h-4 text-indigo-600")} UPI Mobile Payments Setup
-                  </h3>
-                  <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
-                    Set up your business UPI VPA ID (e.g. `9676328206@ybl` or `name@upi`) to let customers pay instantly using any mobile UPI app (Google Pay, PhonePe, Paytm) upon booking confirmation.
-                  </p>
-
-                  <div className="form-row-2 text-left">
-                    <div className="form-group">
-                      <label>Merchant UPI ID (VPA)</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. 9676328206@ybl"
-                        value={settingsUpiIdInput} 
-                        onChange={(e) => setSettingsUpiIdInput(e.target.value)}
-                        className="form-control"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>UPI Payee Name</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Nature Home Clean Services"
-                        value={settingsPayeeNameInput} 
-                        onChange={(e) => setSettingsPayeeNameInput(e.target.value)}
-                        className="form-control"
-                      />
-                    </div>
-                  </div>
-                </div>
 
                 {/* Section: Twilio SMS & WhatsApp Settings */}
                 <div className="premium-card">
