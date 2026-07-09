@@ -13,7 +13,7 @@
 
 // Target Google Sheet ID (from your spreadsheet link - optional)
 // Leave empty ("") if you want the script to automatically find or create a database sheet inside your Google Drive
-const SPREADSHEET_ID = "";
+const SPREADSHEET_ID = "1pj4WTs-uZztay21V4b1dQ3ONWwT5BRDpZD3RbddvZg0";
 // Target Google Drive Folder ID to store database Spreadsheet (optional)
 // Leave empty ("") if you want the sheet to be stored in your main Google Drive root directory
 const FOLDER_ID = "";
