@@ -115,7 +115,8 @@ const DEFAULT_SETTINGS: CompanySettings = {
   recoveryAnswer: "primary",
   feedbackVideos: "https://www.youtube.com/watch?v=1s9S4N5h-3A\nhttps://www.youtube.com/watch?v=wX-y0K43o1k",
   upiId: "9676328206@ybl",
-  payeeName: "Nature Home Clean Services"
+  payeeName: "Nature Home Clean Services",
+  googleAppsScriptUrl: "https://script.google.com/macros/s/AKfycbz_Djs7TXQfFXTPJ67-LIxaqaHXGzo25gJ0kvnmvHY7sQYbshhRR7gEgjlGL4xTdfdw/exec"
 };
 
 export class GoogleSheetsBridge {
@@ -129,7 +130,13 @@ export class GoogleSheetsBridge {
       return DEFAULT_SETTINGS;
     }
     try {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored);
+      // Auto-migrate if script URL is blank
+      if (!parsed.googleAppsScriptUrl || parsed.googleAppsScriptUrl.trim() === "") {
+        parsed.googleAppsScriptUrl = DEFAULT_SETTINGS.googleAppsScriptUrl;
+        localStorage.setItem(`${this.STORAGE_PREFIX}settings`, JSON.stringify(parsed));
+      }
+      return { ...DEFAULT_SETTINGS, ...parsed };
     } catch {
       return DEFAULT_SETTINGS;
     }
