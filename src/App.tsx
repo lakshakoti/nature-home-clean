@@ -50,7 +50,6 @@ function App() {
   
   // Wizard flow results
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
-  const [createdBookingPrice, setCreatedBookingPrice] = useState<number>(0);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
   // Track Booking States
@@ -219,7 +218,6 @@ function App() {
       const result = await GoogleSheetsBridge.createBooking(newBooking);
       if (result.success && result.bookingId) {
         setCreatedBookingId(result.bookingId);
-        setCreatedBookingPrice(newBooking.totalPrice);
         setBookingStep(5); // Show success splash
         
         // Refresh local listings
@@ -270,7 +268,6 @@ function App() {
     setCustAddress("");
     setCustNotes("");
     setCreatedBookingId(null);
-    setCreatedBookingPrice(0);
     setBookingStep(1);
   };
 
@@ -758,8 +755,8 @@ function App() {
                         <img 
                           src={
                             selectedService.id === "carpet" 
-                              ? "/sofa_cleaning.png" 
-                              : "/kitchen_cleaning.png"
+                              ? `${import.meta.env.BASE_URL}sofa_cleaning.png` 
+                              : `${import.meta.env.BASE_URL}kitchen_cleaning.png`
                           } 
                           alt={selectedService.name} 
                           className="w-full h-32 object-cover" 
@@ -1057,48 +1054,10 @@ function App() {
                         <span className="text-xl font-extrabold text-primary tracking-widest">{createdBookingId}</span>
                       </div>
 
-                      {settings.upiId && (
-                        <div className="premium-card border-indigo-150 bg-indigo-50/20 text-left p-4 my-6">
-                          <h4 className="text-xs font-bold text-indigo-950 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            {renderIcon("Wallet", "w-4 h-4 text-indigo-600")}
-                            Pay Securely via UPI Apps
-                          </h4>
-                          <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">
-                            Open any UPI app on your phone (Google Pay, PhonePe, Paytm, BHIM) to transfer the amount instantly.
-                          </p>
-
-                          <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-3 rounded-lg border border-indigo-100">
-                            {/* QR Code */}
-                            <div className="flex-shrink-0 bg-white p-1.5 border border-gray-150 rounded mx-auto sm:mx-0">
-                              <img 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(getUpiUrl(createdBookingPrice, createdBookingId || ""))}`} 
-                                alt="Payment UPI QR Code" 
-                                className="w-28 h-28" 
-                              />
-                            </div>
-                            <div className="flex-1 w-full text-center sm:text-left">
-                              <span className="text-[10px] text-gray-400 block font-bold uppercase">Payee Name</span>
-                              <span className="text-xs font-bold text-gray-700 block mb-2">{settings.payeeName || settings.companyName}</span>
-                              
-                              <span className="text-[10px] text-gray-400 block font-bold uppercase">UPI VPA ID</span>
-                              <code className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded break-all">{settings.upiId}</code>
-                            </div>
-                          </div>
-
-                          <div className="mt-4">
-                            <a 
-                              href={getUpiUrl(createdBookingPrice, createdBookingId || "")}
-                              className="btn btn-primary bg-indigo-600 hover:bg-indigo-700 text-white w-full py-2.5 rounded-lg flex items-center justify-center gap-2 font-bold text-xs shadow-sm"
-                            >
-                              {renderIcon("Wallet", "w-4 h-4")}
-                              Pay ₹{createdBookingPrice} via UPI App
-                            </a>
-                            <p className="text-[10px] text-center text-gray-400 mt-2 italic">
-                              * Once paid, please share the transaction screenshot on WhatsApp with our team for verification.
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                      <div className="bg-emerald-50 text-emerald-950 p-4 rounded-lg text-xs font-semibold text-center border border-emerald-100 my-4">
+                        <span className="font-bold text-emerald-900 block mb-1">Payment Mode: Pay After Work Done</span>
+                        No immediate payment is required. You can pay our certified staff via cash or UPI once the cleaning is completed to your satisfaction.
+                      </div>
 
                       <div className="text-xs text-left bg-emerald-50 text-emerald-900 p-3 rounded-lg border border-emerald-100 mb-6 space-y-1">
                         <p className="font-bold">What happens next?</p>
