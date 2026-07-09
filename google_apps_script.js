@@ -141,7 +141,7 @@ function doPost(e) {
   }
 }
 
-// Initialize tables if they do not exist
+// Initialize tables if they do not exist or are empty
 function initializeSheets() {
   const ss = getSpreadsheet();
   
@@ -149,26 +149,33 @@ function initializeSheets() {
   let bookingsSheet = ss.getSheetByName("Bookings");
   if (!bookingsSheet) {
     bookingsSheet = ss.insertSheet("Bookings");
-    bookingsSheet.appendRow([
+  }
+  
+  let bookingsLastCol = bookingsSheet.getLastColumn();
+  let bookingsHeaders = [];
+  if (bookingsLastCol > 0) {
+    bookingsHeaders = bookingsSheet.getRange(1, 1, 1, bookingsLastCol).getValues()[0];
+  }
+  
+  // Self-heal bookings headers if sheet is empty or headers are missing/corrupted
+  if (bookingsLastCol === 0 || bookingsHeaders.length === 0 || !bookingsHeaders[0] || bookingsHeaders[0].toString().trim() === "") {
+    // Clear sheet to rewrite headers properly
+    bookingsSheet.clear();
+    bookingsSheet.getRange(1, 1, 1, 16).setValues([[
       "Booking ID", "Date", "Time Slot", "Service Name", "Home Size", 
       "Total Price", "Customer Name", "Customer Email", "Customer Phone", 
       "Customer Address", "Status", "Cleaner Assigned", "Admin Notes", "Payment Status", "Payment Method", "Created At"
-    ]);
+    ]]);
     bookingsSheet.getRange(1, 1, 1, 16).setFontWeight("bold").setBackground("#d1e7dd");
   } else {
-    // Auto-upgrade schema for existing databases
-    const lastCol = bookingsSheet.getLastColumn();
-    if (lastCol > 0) {
-      const headersRange = bookingsSheet.getRange(1, 1, 1, lastCol);
-      const headers = headersRange.getValues()[0];
-      if (headers.indexOf("Payment Method") === -1) {
-        const createdAtIdx = headers.indexOf("Created At");
-        if (createdAtIdx !== -1) {
-          bookingsSheet.insertColumnBefore(createdAtIdx + 1);
-          bookingsSheet.getRange(1, createdAtIdx + 1).setValue("Payment Method").setFontWeight("bold").setBackground("#d1e7dd");
-        } else {
-          bookingsSheet.getRange(1, lastCol + 1).setValue("Payment Method").setFontWeight("bold").setBackground("#d1e7dd");
-        }
+    // Auto-upgrade schema for existing databases if they are missing fields
+    if (bookingsHeaders.indexOf("Payment Method") === -1) {
+      const createdAtIdx = bookingsHeaders.indexOf("Created At");
+      if (createdAtIdx !== -1) {
+        bookingsSheet.insertColumnBefore(createdAtIdx + 1);
+        bookingsSheet.getRange(1, createdAtIdx + 1).setValue("Payment Method").setFontWeight("bold").setBackground("#d1e7dd");
+      } else {
+        bookingsSheet.getRange(1, bookingsLastCol + 1).setValue("Payment Method").setFontWeight("bold").setBackground("#d1e7dd");
       }
     }
   }
@@ -177,7 +184,17 @@ function initializeSheets() {
   let servicesSheet = ss.getSheetByName("Services");
   if (!servicesSheet) {
     servicesSheet = ss.insertSheet("Services");
-    servicesSheet.appendRow(["ID", "Name", "Description", "Base Price", "Price Per Bedroom", "Price Per Bathroom", "Icon"]);
+  }
+  
+  let servicesLastCol = servicesSheet.getLastColumn();
+  let servicesHeaders = [];
+  if (servicesLastCol > 0) {
+    servicesHeaders = servicesSheet.getRange(1, 1, 1, servicesLastCol).getValues()[0];
+  }
+  
+  if (servicesLastCol === 0 || servicesHeaders.length === 0 || !servicesHeaders[0] || servicesHeaders[0].toString().trim() === "") {
+    servicesSheet.clear();
+    servicesSheet.getRange(1, 1, 1, 7).setValues([["ID", "Name", "Description", "Base Price", "Price Per Bedroom", "Price Per Bathroom", "Icon"]]);
     servicesSheet.getRange(1, 1, 1, 7).setFontWeight("bold").setBackground("#e2e3e5");
     
     // Seed default services
@@ -197,7 +214,17 @@ function initializeSheets() {
   let settingsSheet = ss.getSheetByName("Settings");
   if (!settingsSheet) {
     settingsSheet = ss.insertSheet("Settings");
-    settingsSheet.appendRow(["Key", "Value"]);
+  }
+  
+  let settingsLastCol = settingsSheet.getLastColumn();
+  let settingsHeaders = [];
+  if (settingsLastCol > 0) {
+    settingsHeaders = settingsSheet.getRange(1, 1, 1, settingsLastCol).getValues()[0];
+  }
+  
+  if (settingsLastCol === 0 || settingsHeaders.length === 0 || !settingsHeaders[0] || settingsHeaders[0].toString().trim() === "") {
+    settingsSheet.clear();
+    settingsSheet.getRange(1, 1, 1, 2).setValues([["Key", "Value"]]);
     settingsSheet.getRange(1, 1, 1, 2).setFontWeight("bold").setBackground("#f8d7da");
     
     // Seed default settings
