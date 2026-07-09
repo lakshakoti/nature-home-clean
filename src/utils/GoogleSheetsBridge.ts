@@ -422,6 +422,8 @@ export class GoogleSheetsBridge {
     }
 
     let syncedCount = 0;
+    const unsyncedBookings: Booking[] = [];
+
     for (const booking of bookings) {
       // If it doesn't have an ID or was created offline, push it to Google Sheets
       try {
@@ -443,10 +445,20 @@ export class GoogleSheetsBridge {
         const result = await response.json();
         if (result.success) {
           syncedCount++;
+        } else {
+          unsyncedBookings.push(booking);
         }
       } catch (err) {
         console.error("Failed to sync booking:", booking, err);
+        unsyncedBookings.push(booking);
       }
+    }
+
+    // Save only bookings that failed to sync back to local storage
+    if (unsyncedBookings.length > 0) {
+      localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(unsyncedBookings));
+    } else {
+      localStorage.removeItem(`${this.STORAGE_PREFIX}bookings`);
     }
 
     return syncedCount;
