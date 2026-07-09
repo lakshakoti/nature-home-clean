@@ -15,6 +15,7 @@ export interface Booking {
   paymentStatus?: "Unpaid" | "Paid";
   paymentMethod?: string;
   createdAt?: string;
+  isSynced?: boolean;
 }
 
 export interface Service {
@@ -198,8 +199,8 @@ export class GoogleSheetsBridge {
         const result = await response.json();
         
         if (result.success && result.data) {
-          // Normalize formatting from Google Sheets
-          const bookings = (result.data.bookings || []).map((b: any) => ({
+          // Normalize formatting from Google Sheets and set isSynced to true
+          const fetchedBookings = (result.data.bookings || []).map((b: any) => ({
             bookingId: b.bookingID || b.bookingId,
             date: String(b.date),
             timeSlot: String(b.timeSlot),
@@ -213,7 +214,8 @@ export class GoogleSheetsBridge {
             status: b.status || "Pending",
             cleanerAssigned: b.cleanerAssigned || "Unassigned",
             adminNotes: b.adminNotes || "",
-            createdAt: b.createdAt || ""
+            createdAt: b.createdAt || "",
+            isSynced: true
           }));
 
           const services = (result.data.services || []).map((s: any) => ({
@@ -256,20 +258,23 @@ export class GoogleSheetsBridge {
           // Save settings cache locally
           this.saveSettingsLocally(mergedSettings);
 
-          // Merge with local offline bookings if any, so they are displayed in the UI
-          const offlineStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
-          const allBookingsForUi = [...bookings];
-          if (offlineStr) {
+          // Get local bookings and extract only the unsynced ones
+          const localBookingsStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
+          let unsyncedLocalBookings: Booking[] = [];
+          if (localBookingsStr) {
             try {
-              const offline = JSON.parse(offlineStr);
-              allBookingsForUi.push(...offline);
+              const localBookings: Booking[] = JSON.parse(localBookingsStr);
+              unsyncedLocalBookings = localBookings.filter(b => b.isSynced !== true);
             } catch {}
           }
 
-          // Update local bookings cache
-          localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(allBookingsForUi));
+          // Merge fetched cloud bookings with local unsynced offline bookings
+          const mergedBookings = [...fetchedBookings, ...unsyncedLocalBookings];
 
-          return { bookings: allBookingsForUi, services, settings: mergedSettings };
+          // Save merged list back to display cache
+          localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(mergedBookings));
+
+          return { bookings: mergedBookings, services, settings: mergedSettings };
         }
       } catch (err) {
         console.warn("Failed to fetch from Google Sheets, falling back to local cache:", err);
@@ -319,8 +324,24 @@ export class GoogleSheetsBridge {
         });
         const result = await response.json();
         if (result.success) {
-          // Sync local bookings cache with new data
-          await this.fetchData();
+          // If posted successfully, save to local device storage with isSynced: true (just like 1st version but marked synced)
+          const newBooking: Booking = { 
+            ...booking, 
+            bookingId: result.bookingId, 
+            isSynced: true 
+          };
+          const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
+          let bookings: Booking[] = [];
+          if (storedStr) {
+            try {
+              bookings = JSON.parse(storedStr);
+            } catch {
+              bookings = [];
+            }
+          }
+          bookings.push(newBooking);
+          localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
+
           return { success: true, bookingId: result.bookingId };
         }
       } catch (err: any) {
@@ -328,36 +349,22 @@ export class GoogleSheetsBridge {
       }
     }
 
-    // Local Storage save (Offline queue)
+    // Local Storage fallback (Offline save) - marked as isSynced: false
     const randNum = Math.floor(1000 + Math.random() * 9000);
     const bookingId = `NHC-${randNum}`;
-    const newBooking: Booking = { ...booking, bookingId };
+    const newBooking: Booking = { ...booking, bookingId, isSynced: false };
 
-    // 1. Add to offline sync queue
-    const offlineStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
-    let offlineBookings: Booking[] = [];
-    if (offlineStr) {
-      try {
-        offlineBookings = JSON.parse(offlineStr);
-      } catch {
-        offlineBookings = [];
-      }
-    }
-    offlineBookings.push(newBooking);
-    localStorage.setItem(`${this.STORAGE_PREFIX}offline_bookings`, JSON.stringify(offlineBookings));
-
-    // 2. Also append to display cache
     const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
-    let displayBookings: Booking[] = [];
+    let bookings: Booking[] = [];
     if (storedStr) {
       try {
-        displayBookings = JSON.parse(storedStr);
+        bookings = JSON.parse(storedStr);
       } catch {
-        displayBookings = [];
+        bookings = [];
       }
     }
-    displayBookings.push(newBooking);
-    localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(displayBookings));
+    bookings.push(newBooking);
+    localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
 
     return { success: true, bookingId };
   }
@@ -365,6 +372,7 @@ export class GoogleSheetsBridge {
   // Update an existing booking
   public static async updateBooking(bookingId: string, updates: Partial<Booking>): Promise<{ success: boolean; error?: string }> {
     const settings = this.getSettings();
+    let onlineSuccess = false;
 
     if (settings.googleAppsScriptUrl && settings.googleAppsScriptUrl.trim() !== "") {
       try {
@@ -382,36 +390,27 @@ export class GoogleSheetsBridge {
         });
         const result = await response.json();
         if (result.success) {
-          await this.fetchData(); // Refresh local cache
-          return { success: true };
+          onlineSuccess = true;
         }
       } catch (err: any) {
         console.error("Failed to update on Google Sheets, updating LocalStorage:", err);
       }
     }
 
-    // Local Storage update
-    // Update in offline queue if present
-    const offlineStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
-    if (offlineStr) {
-      try {
-        const offlineBookings: Booking[] = JSON.parse(offlineStr);
-        const idx = offlineBookings.findIndex(b => b.bookingId === bookingId);
-        if (idx !== -1) {
-          offlineBookings[idx] = { ...offlineBookings[idx], ...updates };
-          localStorage.setItem(`${this.STORAGE_PREFIX}offline_bookings`, JSON.stringify(offlineBookings));
-        }
-      } catch {}
-    }
-
-    // Update in display cache
+    // Local Storage update (Always keeps the data on the device!)
     const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
     if (storedStr) {
       try {
         const bookings: Booking[] = JSON.parse(storedStr);
         const index = bookings.findIndex(b => b.bookingId === bookingId);
         if (index !== -1) {
-          bookings[index] = { ...bookings[index], ...updates };
+          bookings[index] = { 
+            ...bookings[index], 
+            ...updates 
+          };
+          if (onlineSuccess) {
+            bookings[index].isSynced = true; // Mark synced if it was uploaded to Sheets successfully
+          }
           localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
           return { success: true };
         }
@@ -447,7 +446,7 @@ export class GoogleSheetsBridge {
 
   // Sync any local bookings that aren't on the Sheet (run after a successful connection setup)
   public static async syncLocalToSheets(url: string): Promise<number> {
-    const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
+    const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
     if (!storedStr) return 0;
     
     let bookings: Booking[] = [];
@@ -458,45 +457,41 @@ export class GoogleSheetsBridge {
     }
 
     let syncedCount = 0;
-    const unsyncedBookings: Booking[] = [];
-
-    for (const booking of bookings) {
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          mode: "cors",
-          headers: {
-            "Content-Type": "text/plain"
-          },
-          body: JSON.stringify({
-            action: "createBooking",
-            booking: {
-              ...booking,
-              status: booking.status || "Pending",
-              cleanerAssigned: booking.cleanerAssigned || "Unassigned"
-            }
-          })
-        });
-        const result = await response.json();
-        if (result.success) {
-          syncedCount++;
-        } else {
-          unsyncedBookings.push(booking);
+    
+    // Find only the unsynced bookings to upload
+    for (let i = 0; i < bookings.length; i++) {
+      if (bookings[i].isSynced !== true) {
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+              "Content-Type": "text/plain"
+            },
+            body: JSON.stringify({
+              action: "createBooking",
+              booking: {
+                ...bookings[i],
+                status: bookings[i].status || "Pending",
+                cleanerAssigned: bookings[i].cleanerAssigned || "Unassigned"
+              }
+            })
+          });
+          const result = await response.json();
+          if (result.success) {
+            bookings[i].isSynced = true; // Mark as synced!
+            syncedCount++;
+          }
+        } catch (err) {
+          console.error("Failed to sync booking:", bookings[i], err);
         }
-      } catch (err) {
-        console.error("Failed to sync booking:", booking, err);
-        unsyncedBookings.push(booking);
       }
     }
 
-    // Save only bookings that failed to sync back to local storage queue
-    if (unsyncedBookings.length > 0) {
-      localStorage.setItem(`${this.STORAGE_PREFIX}offline_bookings`, JSON.stringify(unsyncedBookings));
-    } else {
-      localStorage.removeItem(`${this.STORAGE_PREFIX}offline_bookings`);
-    }
+    // Save the updated list back to the local device storage (keeping the data on the device!)
+    localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
 
-    // Refresh UI display cache from Google Sheets
+    // Refresh UI display cache from Google Sheets (which merges sheets data with unsynced local data)
     await this.fetchData();
 
     return syncedCount;
