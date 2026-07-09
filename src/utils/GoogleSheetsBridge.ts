@@ -399,6 +399,7 @@ export class GoogleSheetsBridge {
 
     // Local Storage update (Always keeps the data on the device!)
     const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
+    let localUpdated = false;
     if (storedStr) {
       try {
         const bookings: Booking[] = JSON.parse(storedStr);
@@ -412,9 +413,13 @@ export class GoogleSheetsBridge {
             bookings[index].isSynced = true; // Mark synced if it was uploaded to Sheets successfully
           }
           localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
-          return { success: true };
+          localUpdated = true;
         }
       } catch {}
+    }
+
+    if (onlineSuccess || localUpdated) {
+      return { success: true };
     }
 
     return { success: false, error: "Booking ID not found." };
