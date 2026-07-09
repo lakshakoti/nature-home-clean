@@ -256,10 +256,20 @@ export class GoogleSheetsBridge {
           // Save settings cache locally
           this.saveSettingsLocally(mergedSettings);
 
-          // Update local bookings cache
-          localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
+          // Merge with local offline bookings if any, so they are displayed in the UI
+          const offlineStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
+          const allBookingsForUi = [...bookings];
+          if (offlineStr) {
+            try {
+              const offline = JSON.parse(offlineStr);
+              allBookingsForUi.push(...offline);
+            } catch {}
+          }
 
-          return { bookings, services, settings: mergedSettings };
+          // Update local bookings cache
+          localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(allBookingsForUi));
+
+          return { bookings: allBookingsForUi, services, settings: mergedSettings };
         }
       } catch (err) {
         console.warn("Failed to fetch from Google Sheets, falling back to local cache:", err);
@@ -318,22 +328,36 @@ export class GoogleSheetsBridge {
       }
     }
 
-    // Local Storage save
+    // Local Storage save (Offline queue)
     const randNum = Math.floor(1000 + Math.random() * 9000);
     const bookingId = `NHC-${randNum}`;
     const newBooking: Booking = { ...booking, bookingId };
 
-    const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
-    let bookings: Booking[] = [];
-    if (storedStr) {
+    // 1. Add to offline sync queue
+    const offlineStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
+    let offlineBookings: Booking[] = [];
+    if (offlineStr) {
       try {
-        bookings = JSON.parse(storedStr);
+        offlineBookings = JSON.parse(offlineStr);
       } catch {
-        bookings = [];
+        offlineBookings = [];
       }
     }
-    bookings.push(newBooking);
-    localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
+    offlineBookings.push(newBooking);
+    localStorage.setItem(`${this.STORAGE_PREFIX}offline_bookings`, JSON.stringify(offlineBookings));
+
+    // 2. Also append to display cache
+    const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
+    let displayBookings: Booking[] = [];
+    if (storedStr) {
+      try {
+        displayBookings = JSON.parse(storedStr);
+      } catch {
+        displayBookings = [];
+      }
+    }
+    displayBookings.push(newBooking);
+    localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(displayBookings));
 
     return { success: true, bookingId };
   }
@@ -367,6 +391,20 @@ export class GoogleSheetsBridge {
     }
 
     // Local Storage update
+    // Update in offline queue if present
+    const offlineStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
+    if (offlineStr) {
+      try {
+        const offlineBookings: Booking[] = JSON.parse(offlineStr);
+        const idx = offlineBookings.findIndex(b => b.bookingId === bookingId);
+        if (idx !== -1) {
+          offlineBookings[idx] = { ...offlineBookings[idx], ...updates };
+          localStorage.setItem(`${this.STORAGE_PREFIX}offline_bookings`, JSON.stringify(offlineBookings));
+        }
+      } catch {}
+    }
+
+    // Update in display cache
     const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
     if (storedStr) {
       try {
@@ -377,9 +415,7 @@ export class GoogleSheetsBridge {
           localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(bookings));
           return { success: true };
         }
-      } catch {
-        return { success: false, error: "Failed to parse local bookings database." };
-      }
+      } catch {}
     }
 
     return { success: false, error: "Booking ID not found." };
@@ -411,7 +447,7 @@ export class GoogleSheetsBridge {
 
   // Sync any local bookings that aren't on the Sheet (run after a successful connection setup)
   public static async syncLocalToSheets(url: string): Promise<number> {
-    const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}bookings`);
+    const storedStr = localStorage.getItem(`${this.STORAGE_PREFIX}offline_bookings`);
     if (!storedStr) return 0;
     
     let bookings: Booking[] = [];
@@ -425,7 +461,6 @@ export class GoogleSheetsBridge {
     const unsyncedBookings: Booking[] = [];
 
     for (const booking of bookings) {
-      // If it doesn't have an ID or was created offline, push it to Google Sheets
       try {
         const response = await fetch(url, {
           method: "POST",
@@ -454,12 +489,15 @@ export class GoogleSheetsBridge {
       }
     }
 
-    // Save only bookings that failed to sync back to local storage
+    // Save only bookings that failed to sync back to local storage queue
     if (unsyncedBookings.length > 0) {
-      localStorage.setItem(`${this.STORAGE_PREFIX}bookings`, JSON.stringify(unsyncedBookings));
+      localStorage.setItem(`${this.STORAGE_PREFIX}offline_bookings`, JSON.stringify(unsyncedBookings));
     } else {
-      localStorage.removeItem(`${this.STORAGE_PREFIX}bookings`);
+      localStorage.removeItem(`${this.STORAGE_PREFIX}offline_bookings`);
     }
+
+    // Refresh UI display cache from Google Sheets
+    await this.fetchData();
 
     return syncedCount;
   }
