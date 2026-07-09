@@ -235,7 +235,7 @@ function getSheetDataAsObjects(sheet) {
     const obj = {};
     headers.forEach((header, index) => {
       // Map header strings to camelCase or simple keys
-      const key = toCamelCase(header);
+      const key = toCamelCase(header.toString().trim());
       obj[key] = row[index];
     });
     data.push(obj);
@@ -247,6 +247,8 @@ function getSheetDataAsObjects(sheet) {
 // Convert header text to camelCase keys
 function toCamelCase(str) {
   return str
+    .toString()
+    .trim()
     .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => index === 0 ? word.toLowerCase() : word.toUpperCase())
     .replace(/\s+/g, '');
 }
@@ -323,7 +325,7 @@ function updateBooking(ss, bookingId, updates) {
   
   let targetRowIndex = -1;
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === bookingId) {
+    if (String(data[i][0]).trim().toLowerCase() === String(bookingId).trim().toLowerCase()) {
       targetRowIndex = i + 1; // 1-indexed for sheets
       break;
     }
@@ -333,10 +335,16 @@ function updateBooking(ss, bookingId, updates) {
     return { success: false, error: "Booking ID not found: " + bookingId };
   }
   
-  // Apply updates
+  // Apply updates with case-insensitive and trimmed header matching
   for (let key in updates) {
-    const columnName = fromCamelCase(key);
-    const colIndex = headers.indexOf(columnName);
+    const columnName = fromCamelCase(key).toLowerCase().trim();
+    let colIndex = -1;
+    for (let h = 0; h < headers.length; h++) {
+      if (String(headers[h]).toLowerCase().trim() === columnName) {
+        colIndex = h;
+        break;
+      }
+    }
     if (colIndex !== -1) {
       sheet.getRange(targetRowIndex, colIndex + 1).setValue(updates[key]);
     }
