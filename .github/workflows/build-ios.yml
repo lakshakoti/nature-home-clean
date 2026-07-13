@@ -34,14 +34,20 @@ jobs:
       - name: Sync Capacitor iOS
         run: npx cap sync ios
 
+      - name: Resolve Swift Package Manager Dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+                     -workspace ios/App/App.xcworkspace \
+                     -scheme App
+
       - name: Build Xcode Project for iOS Simulator
         run: |
           xcodebuild -workspace ios/App/App.xcworkspace \
                      -scheme App \
-                     -sdk iphonesimulator \
                      -configuration Debug \
+                     -destination "generic/platform=iOS Simulator" \
                      -derivedDataPath build \
-                     clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+                     clean build
 
       - name: Zip Simulator App Build
         run: |
