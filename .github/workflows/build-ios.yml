@@ -51,8 +51,7 @@ jobs:
 
       - name: Zip Simulator App Build
         run: |
-          cd build/Build/Products/Debug-iphonesimulator
-          zip -r ../../../nature-home-clean-ios-simulator.zip App.app
+          zip -r nature-home-clean-ios-simulator.zip build/Build/Products/Debug-iphonesimulator/App.app
 
       - name: Upload iOS Simulator Build
         uses: actions/upload-artifact@v4
