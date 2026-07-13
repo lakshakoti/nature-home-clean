@@ -37,12 +37,12 @@ jobs:
       - name: Resolve Swift Package Manager Dependencies
         run: |
           xcodebuild -resolvePackageDependencies \
-                     -workspace ios/App/App.xcworkspace \
+                     -project ios/App/App.xcodeproj \
                      -scheme App
 
       - name: Build Xcode Project for iOS Simulator
         run: |
-          xcodebuild -workspace ios/App/App.xcworkspace \
+          xcodebuild -project ios/App/App.xcodeproj \
                      -scheme App \
                      -configuration Debug \
                      -destination "generic/platform=iOS Simulator" \
